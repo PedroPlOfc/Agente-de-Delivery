@@ -39,7 +39,7 @@ API desenvolvida em Python com **FastAPI** e **Google Gemini API** que interpret
       │
       ▼
   [ Equipe de Separação / ERP / CRM ]
-
+```
 🚀 Tecnologias Utilizadas
 Python 3.10+: Linguagem de programação principal utilizada no desenvolvimento.
 
@@ -146,3 +146,4 @@ JSON
     "mensagem_resposta": "Lista de compras recebida com sucesso! Separaremos seus itens agora mesmo."
   }
 }
+
