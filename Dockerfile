@@ -1,4 +1,4 @@
-FROM atendai/evolution-api:v1.8.2
+FROM evoapicloud/evolution-api:v1.8.2
 
 ENV PORT=8080
 EXPOSE 8080
