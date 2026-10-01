@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projeto Hermes - Painel de Testes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+    <div class="max-w-5xl mx-auto space-y-6">
+        
+        <header class="flex items-center justify-between border-b border-slate-700 pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-amber-400">⚡ Projeto Hermes</h1>
+                <p class="text-slate-400 text-sm">Agente de IA para Delivery & Automação de Supermercados</p>
+            </div>
+            <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30">
+                ● Gemini + FastAPI
+            </span>
+        </header>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Card de Envio -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
+                <h2 class="text-xl font-semibold text-slate-200">Simular Pedido de Cliente</h2>
+                
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Telefone do Cliente</label>
+                    <input id="telefone" type="text" value="5581999999999" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-400">
+                </div>
+
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Mensagem do Pedido</label>
+                    <textarea id="mensagem" rows="6" placeholder="Ex: Quero 2kg de acém, 1 caixa de leite e 3 pacotes de arroz..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-400"></textarea>
+                </div>
+
+                <button onclick="enviarPedido()" id="btn-enviar" class="w-full bg-amber-500 hover:bg-amber-600 font-bold py-3 px-4 rounded-lg text-slate-950 transition-colors flex justify-center items-center gap-2">
+                    <span>Processar Pedido com Hermes</span>
+                </button>
+            </div>
+
+            <!-- Card de Resultado -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4 flex flex-col">
+                <h2 class="text-xl font-semibold text-slate-200">Resultado da IA</h2>
+                
+                <div id="loading" class="hidden flex-1 flex flex-col items-center justify-center py-10 space-y-3">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-400"></div>
+                    <p class="text-sm text-slate-400">Hermes está processando com o Gemini...</p>
+                </div>
+
+                <div id="resultado-vazio" class="flex-1 flex items-center justify-center border-2 border-dashed border-slate-700 rounded-lg p-6 text-slate-500 text-sm text-center">
+                    Aguardando o envio de um pedido para exibir a separação estruturada.
+                </div>
+
+                <div id="resultado-container" class="hidden space-y-4 overflow-y-auto max-h-[500px]">
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <h3 class="text-xs uppercase font-bold text-amber-400 mb-2">Mensagem de Resposta (WhatsApp)</h3>
+                        <p id="msg-resposta" class="text-slate-300 text-sm whitespace-pre-line"></p>
+                    </div>
+
+                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                        <h3 class="text-xs uppercase font-bold text-emerald-400 mb-2">Lista de Separação Categorizada</h3>
+                        <div id="itens-categorizados" class="space-y-3 text-sm"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        async function enviarPedido() {
+            const telefone = document.getElementById('telefone').value;
+            const mensagem = document.getElementById('mensagem').value;
+            const btn = document.getElementById('btn-enviar');
+            const loading = document.getElementById('loading');
+            const resultadoVazio = document.getElementById('resultado-vazio');
+            const resultadoContainer = document.getElementById('resultado-container');
+
+            if (!mensagem.trim()) {
+                alert('Digite uma mensagem antes de enviar!');
+                return;
+            }
+
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+            resultadoVazio.classList.add('hidden');
+            resultadoContainer.classList.add('hidden');
+
+            try {
+                const response = await fetch('/webhook/mercado', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telefone, mensagem })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const lista = data.lista_separacao;
+                    document.getElementById('msg-resposta').innerText = lista.mensagem_resposta;
+
+                    const containerItens = document.getElementById('itens-categorizados');
+                    containerItens.innerHTML = '';
+
+                    lista.itens.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center justify-between bg-slate-800 p-2.5 rounded border border-slate-700';
+                        div.innerHTML = `
+                            <div>
+                                <span class="font-medium text-slate-200">${item.produto}</span>
+                                <span class="text-xs text-slate-400 block">${item.quantidade} ${item.unidade || ''}</span>
+                            </div>
+                            <span class="text-xs bg-slate-700 text-amber-300 px-2 py-1 rounded font-mono">${item.categoria}</span>
+                        `;
+                        containerItens.appendChild(div);
+                    });
+
+                    resultadoContainer.classList.remove('hidden');
+                } else {
+                    alert('Erro no processamento: ' + JSON.stringify(data));
+                    resultadoVazio.classList.remove('hidden');
+                }
+            } catch (err) {
+                alert('Falha ao comunicar com o servidor: ' + err.message);
+                resultadoVazio.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
