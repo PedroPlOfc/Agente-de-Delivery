@@ -33,7 +33,11 @@
 
                 <div>
                     <label class="block text-sm text-slate-400 mb-1">Mensagem do Pedido</label>
-                    <textarea id="mensagem" rows="6" placeholder="Ex: Quero 2kg de acém, 1 caixa de leite e 3 pacotes de arroz..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-400"></textarea>
+                    <textarea id="mensagem" rows="6" placeholder="Ex: Quero 2kg de acém, 10 reais de queijo e 2 fardos de coca..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-400">2kg de arroz
+2kg de feijão
+2 pacotes de macarrão
+10 reais de queijo
+2 fardos de coca cola zero</textarea>
                 </div>
 
                 <button onclick="enviarPedido()" id="btn-enviar" class="w-full bg-amber-500 hover:bg-amber-600 font-bold py-3 px-4 rounded-lg text-slate-950 transition-colors flex justify-center items-center gap-2">
@@ -61,7 +65,7 @@
                     </div>
 
                     <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
-                        <h3 class="text-xs uppercase font-bold text-emerald-400 mb-2">Lista de Separação Categorizada</h3>
+                        <h3 class="text-xs uppercase font-bold text-emerald-400 mb-3">Lista de Separação Categorizada</h3>
                         <div id="itens-categorizados" class="space-y-3 text-sm"></div>
                     </div>
                 </div>
@@ -72,65 +76,76 @@
 
     <script>
         async function enviarPedido() {
-            const telefone = document.getElementById('telefone').value;
-            const mensagem = document.getElementById('mensagem').value;
-            const btn = document.getElementById('btn-enviar');
-            const loading = document.getElementById('loading');
-            const resultadoVazio = document.getElementById('resultado-vazio');
-            const resultadoContainer = document.getElementById('resultado-container');
+    const telefone = document.getElementById('telefone').value;
+    const mensagem = document.getElementById('mensagem').value;
+    const btn = document.getElementById('btn-enviar');
+    const loading = document.getElementById('loading');
+    const resultadoVazio = document.getElementById('resultado-vazio');
+    const resultadoContainer = document.getElementById('resultado-container');
 
-            if (!mensagem.trim()) {
-                alert('Digite uma mensagem antes de enviar!');
-                return;
-            }
+    if (!mensagem.trim()) {
+        alert('Digite uma mensagem antes de enviar!');
+        return;
+    }
 
-            btn.disabled = true;
-            loading.classList.remove('hidden');
-            resultadoVazio.classList.add('hidden');
-            resultadoContainer.classList.add('hidden');
+    btn.disabled = true;
+    loading.classList.remove('hidden');
+    resultadoVazio.classList.add('hidden');
+    resultadoContainer.classList.add('hidden');
 
-            try {
-                const response = await fetch('/webhook/mercado', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telefone, mensagem })
-                });
+    // Detecta o hostname atual de quem abriu a página (localhost, IP local ou domínio) e força a porta 8000 do FastAPI
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname || 'localhost';
+    const baseUrl = `${protocol}//${hostname}:8000`;
 
-                const data = await response.json();
+    try {
+        const response = await fetch(`${baseUrl}/webhook/mercado`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone, mensagem })
+        });
 
-                if (response.ok) {
-                    const lista = data.lista_separacao;
-                    document.getElementById('msg-resposta').innerText = lista.mensagem_resposta;
+        const data = await response.json();
 
-                    const containerItens = document.getElementById('itens-categorizados');
-                    containerItens.innerHTML = '';
+        if (response.ok) {
+            const lista = data.lista_separacao;
+            document.getElementById('msg-resposta').innerText = lista.mensagem_resposta;
 
-                    lista.itens.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'flex items-center justify-between bg-slate-800 p-2.5 rounded border border-slate-700';
-                        div.innerHTML = `
-                            <div>
-                                <span class="font-medium text-slate-200">${item.produto}</span>
-                                <span class="text-xs text-slate-400 block">${item.quantidade} ${item.unidade || ''}</span>
-                            </div>
-                            <span class="text-xs bg-slate-700 text-amber-300 px-2 py-1 rounded font-mono">${item.categoria}</span>
-                        `;
-                        containerItens.appendChild(div);
-                    });
+            const containerItens = document.getElementById('itens-categorizados');
+            containerItens.innerHTML = '';
 
-                    resultadoContainer.classList.remove('hidden');
-                } else {
-                    alert('Erro no processamento: ' + JSON.stringify(data));
-                    resultadoVazio.classList.remove('hidden');
+            lista.itens.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700';
+                
+                let textoQuantidade = `${item.quantidade} ${item.unidade_medida || 'un'}`;
+                if (item.unidade_medida && item.unidade_medida.toLowerCase().includes('real')) {
+                    textoQuantidade = `R$ ${item.quantidade.toFixed(2)}`;
                 }
-            } catch (err) {
-                alert('Falha ao comunicar com o servidor: ' + err.message);
-                resultadoVazio.classList.remove('hidden');
-            } finally {
-                btn.disabled = false;
-                loading.classList.add('hidden');
-            }
+
+                div.innerHTML = `
+                    <div>
+                        <span class="font-medium text-slate-100 block">${item.produto}</span>
+                        <span class="text-xs font-mono text-amber-400">${textoQuantidade}</span>
+                    </div>
+                    <span class="text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600 font-semibold">${item.categoria || 'Outros'}</span>
+                `;
+                containerItens.appendChild(div);
+            });
+
+            resultadoContainer.classList.remove('hidden');
+        } else {
+            alert('Erro no processamento: ' + JSON.stringify(data));
+            resultadoVazio.classList.remove('hidden');
         }
+    } catch (err) {
+        alert('Falha ao comunicar com o servidor: ' + err.message);
+        resultadoVazio.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        loading.classList.add('hidden');
+    }
+}
     </script>
 </body>
 </html>

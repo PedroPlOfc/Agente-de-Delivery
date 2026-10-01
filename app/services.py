@@ -17,47 +17,64 @@ Categorias permitidas: Açougue, Laticínios e Frios, Hortifruti, Mercearia, Beb
 """
 
 def extrair_itens_inteligente(texto: str) -> list:
-    """Parser regex resiliente para extrair produtos, quantidades e categorias localmente."""
     linhas = [l.strip() for l in texto.split("\n") if l.strip()]
     itens = []
 
     mapeamento_categorias = {
-        "arroz": ("Mercearia", "kg"),
-        "feijão": ("Mercearia", "kg"),
-        "feijao": ("Mercearia", "kg"),
-        "macarrão": ("Mercearia", "pacote"),
-        "macarrao": ("Mercearia", "pacote"),
-        "queijo": ("Laticínios e Frios", "g"),
-        "presunto": ("Laticínios e Frios", "g"),
-        "leite": ("Laticínios e Frios", "caixa"),
-        "coca": ("Bebidas", "fardo"),
-        "cerveja": ("Bebidas", "fardo"),
-        "refrigerante": ("Bebidas", "unidade"),
-        "carne": ("Açougue", "kg"),
-        "frango": ("Açougue", "kg"),
-        "detergente": ("Limpeza e Higiene", "unidade"),
-        "sabão": ("Limpeza e Higiene", "unidade"),
+        "arroz": "Mercearia",
+        "feijão": "Mercearia",
+        "feijao": "Mercearia",
+        "macarrão": "Mercearia",
+        "macarrao": "Mercearia",
+        "queijo": "Laticínios e Frios",
+        "presunto": "Laticínios e Frios",
+        "leite": "Laticínios e Frios",
+        "coca": "Bebidas",
+        "cerveja": "Bebidas",
+        "refrigerante": "Bebidas",
+        "carne": "Açougue",
+        "frango": "Açougue",
+        "detergente": "Limpeza e Higiene",
+        "sabão": "Limpeza e Higiene",
     }
 
     for linha in linhas:
         linha_lower = linha.lower()
         
-        # Tenta extrair quantidade (ex: 2kg, 2k, 10 reais, 2 fardos)
+        # 1. Extrai a quantidade numérica (ex: 2, 10, 1.5)
         qtd_match = re.search(r'(\d+(?:[\.,]\d+)?)', linha)
         qtd = float(qtd_match.group(1).replace(',', '.')) if qtd_match else 1.0
 
-        # Identifica categoria e unidade padrão baseada no produto
-        cat_encontrada = "Mercearia"
-        unid_encontrada = "un"
-        
-        for palavra_chave, (cat, unid) in mapeamento_categorias.items():
+        # 2. Captura dinamicamente a unidade mesmo grudada no número (ex: 2kg, 10reais)
+        unid_match = re.search(r'(kg|k|g|fardos|fardo|reais|real|pacotes|pacote|caixas|caixa|unidades|un)', linha_lower)
+        if unid_match:
+            unid_encontrada = unid_match.group(1)
+            if unid_encontrada in ['k', 'kg']:
+                unid_encontrada = 'kg'
+            elif unid_encontrada in ['real', 'reais']:
+                unid_encontrada = 'reais'
+            elif unid_encontrada in ['fardos', 'fardo']:
+                unid_encontrada = 'fardos'
+            elif unid_encontrada in ['pacotes', 'pacote']:
+                unid_encontrada = 'pacote'
+        else:
+            unid_encontrada = "un"
+
+        # 3. Mapeia a categoria correspondente ao produto
+        cat_encontrada = "Outros"
+        for palavra_chave, cat in mapeamento_categorias.items():
             if palavra_chave in linha_lower:
                 cat_encontrada = cat
-                unid_encontrada = unid
                 break
 
-        # Limpa o nome do produto removendo a quantidade do início
-        nome_produto = re.sub(r'^\d+\s*(?:kg|k|g|fardos|fardo|reais|un|pacotes)?\s*(?:de)?\s*', '', linha, flags=re.IGNORECASE).strip()
+        # 4. Limpa o nome do produto removendo a quantidade, unidade e preposição do início
+        nome_produto = re.sub(
+            r'^\d+\s*(?:kg|k|g|fardos|fardo|reais|real|un|pacotes|pacote|caixas|caixa)?\s*(?:de)?\s*', 
+            '', 
+            linha, 
+            flags=re.IGNORECASE
+        ).strip()
+        
         if not nome_produto:
             nome_produto = linha
 
@@ -83,7 +100,6 @@ def extrair_itens_inteligente(texto: str) -> list:
 
 
 def gerar_resposta_local(texto_mensagem: str) -> str:
-    """Monta a payload do Hermes garantindo o formato do Pydantic sem depender da nuvem."""
     itens = extrair_itens_inteligente(texto_mensagem)
     mock_data = {
         "nome_cliente": "Cliente Hermes",
@@ -96,7 +112,7 @@ def gerar_resposta_local(texto_mensagem: str) -> str:
 
 
 def chamar_gemini(texto_mensagem: str) -> str:
-    """Tenta executar na API do Gemini. Em caso de 503/429/404, aciona o Fallback Local."""
+    """Função importada pelo main.py para processar o pedido via Gemini ou Fallback Local."""
     if not client:
         return gerar_resposta_local(texto_mensagem)
 
