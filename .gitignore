@@ -1,9 +1,16 @@
+# Ambientes Virtuais
+venv/
+.venv/
+
+# Configuração e Chaves Sensíveis (NUNCA envie para o GitHub)
+.env
+
+# Cache do Python e Testes
 __pycache__/
 *.py[cod]
 app/__pycache__/
 tests/__pycache__/
 .pytest_cache/
-venv/
-.venv/
-.env
-.html
+
+# Configurações do Obsidian (apenas workspace e plugins locais)
+.obsidian/
