@@ -1,15 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import json
 
 from app.services import chamar_gemini
 
 app = FastAPI(title="Projeto Hermes — Fast Delivery")
 
-# Permite requisições do frontend local
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,7 +29,6 @@ async def webhook_mercado(request: Request):
     mensagem = data.get("mensagem", "")
     itens_atuais = data.get("itens_atuais", [])
     
-    # Processa o pedido passando o contexto atual dos itens
     resposta_json_str = chamar_gemini(mensagem, itens_atuais)
     
     return {

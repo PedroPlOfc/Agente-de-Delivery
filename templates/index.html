@@ -34,7 +34,7 @@
                         Projeto Hermes
                         <span class="text-amber-400 text-xs font-mono bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">Fast Delivery</span>
                     </h1>
-                    <p class="text-xs text-slate-400">Simulador de Atendimento e Extração com IA</p>
+                    <p class="text-xs text-slate-400">Simulador de Atendimento e Extração Adaptável com IA</p>
                 </div>
             </div>
             <span class="px-3 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center gap-2">
@@ -119,7 +119,7 @@
                     </div>
 
                     <div id="loading-ia" class="hidden text-center py-4 text-amber-400 text-xs flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-circle-notch animate-spin"></i> Processando com IA/Engine Local...
+                        <i class="fa-solid fa-circle-notch animate-spin"></i> Processando com IA...
                     </div>
                 </div>
             </div>
@@ -129,6 +129,12 @@
 
     <script>
     let listaGlobalItens = [];
+
+    function formatarQtdFormatada(qtd) {
+        const num = parseFloat(qtd);
+        if (isNaN(num)) return qtd;
+        return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+    }
 
     async function enviarMensagemChat(event) {
         event.preventDefault();
@@ -156,7 +162,7 @@
                 body: JSON.stringify({ 
                     telefone: telefoneCliente, 
                     mensagem: mensagem,
-                    itens_atuais: listaGlobalItens // Envia o contexto atual para o backend
+                    itens_atuais: listaGlobalItens
                 })
             });
 
@@ -170,12 +176,12 @@
                     lista = JSON.parse(lista);
                 }
 
-                // O backend agora retorna a lista final inteira atualizada
+                // O estado do carrinho é atualizado 100% via resposta da IA
                 if (lista.itens) {
                     listaGlobalItens = lista.itens;
                 }
 
-                adicionarBalaoChat('bot', lista.mensagem_resposta || gerarMensagemRespostaAcumulada(listaGlobalItens), 'Hermes');
+                adicionarBalaoChat('bot', lista.mensagem_resposta || gerarMensagemRespostaFallback(listaGlobalItens), 'Hermes');
                 atualizarPainelExtracao(lista);
             } else {
                 adicionarBalaoChat('bot', '⚠️ Ocorreu um problema ao processar seu pedido. Pode enviar novamente?', 'Hermes');
@@ -192,24 +198,22 @@
     function removerItemManual(index) {
         listaGlobalItens.splice(index, 1);
         atualizarPainelExtracao({ itens: listaGlobalItens });
-        adicionarBalaoChat('bot', '🗑️ Item removido da sua lista com sucesso!', 'Hermes');
+        adicionarBalaoChat('bot', gerarMensagemRespostaFallback(listaGlobalItens), 'Hermes');
     }
 
-    function gerarMensagemRespostaAcumulada(itens) {
+    function gerarMensagemRespostaFallback(itens) {
         if (!itens || itens.length === 0) {
             return "Sua lista de compras está vazia no momento. O que gostaria de adicionar?";
         }
 
         let textoItens = itens.map((i, index) => {
-            let qtdStr = `${i.quantidade} ${i.unidade_medida || 'un'}`;
-            if (i.unidade_medida === 'reais') qtdStr = `R$ ${i.quantidade.toFixed(2)}`;
+            let qtdDisplay = formatarQtdFormatada(i.quantidade);
+            let qtdStr = `${qtdDisplay} ${i.unidade_medida || 'un'}`;
+            if (i.unidade_medida === 'reais') qtdStr = `R$ ${parseFloat(i.quantidade).toFixed(2)}`;
             
-            let nomeLimpo = i.produto.replace(/^(?:de\s+)?(?:\d+[\.,]?\d*)\s*(?:pct|un|kg|k|fardo|reais)?\s*(?:de\s+)?/i, '').trim();
-            if (!nomeLimpo) nomeLimpo = i.produto;
-
             let marcaStr = i.marca_preferida ? ` (🏷️ ${i.marca_preferida})` : '';
 
-            return `${index + 1}. ${qtdStr} de ${nomeLimpo}${marcaStr}`;
+            return `${index + 1}. ${qtdStr} de ${i.produto}${marcaStr}`;
         }).join('\n');
 
         return `Olá! Aqui está a sua lista atualizada:\n\n${textoItens}\n\n1️⃣ Está tudo certinho ou gostaria de alterar algo?\n2️⃣ Qual será a forma de pagamento?`;
@@ -266,12 +270,6 @@
         if (el) el.remove();
     }
 
-    function limparNomeProduto(produto) {
-        if (!produto) return '';
-        let limpo = produto.replace(/(?:da marca|marca)\s+[a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]+/gi, '').trim();
-        return limpo || produto;
-    }
-
     function atualizarPainelExtracao(lista) {
         const container = document.getElementById('itens-container');
         const badgePagamento = document.getElementById('badge-pagamento');
@@ -296,15 +294,15 @@
             const div = document.createElement('div');
             div.className = 'flex items-center justify-between bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 shadow-sm';
             
-            let textoQtd = `${item.quantidade} ${item.unidade_medida || 'un'}`;
+            let qtdDisplay = formatarQtdFormatada(item.quantidade);
+            let textoQtd = `${qtdDisplay} ${item.unidade_medida || 'un'}`;
             if (item.unidade_medida === 'reais') {
-                textoQtd = `R$ ${item.quantidade.toFixed(2)}`;
+                textoQtd = `R$ ${parseFloat(item.quantidade).toFixed(2)}`;
             }
 
-            const produtoExibicao = limparNomeProduto(item.produto);
-
             let badgeMarca = '';
-            if (item.marca_preferida) {
+            // Exibe a marca apenas se ela for diferente do nome do produto
+            if (item.marca_preferida && item.marca_preferida.toLowerCase() !== item.produto.toLowerCase()) {
                 badgeMarca = `<span class="text-[10px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20 font-medium">🏷️ ${escaparHTML(item.marca_preferida)}</span>`;
             }
 
@@ -313,7 +311,7 @@
                     <span class="w-2 h-2 rounded-full bg-amber-400"></span>
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="font-medium text-xs text-slate-100 block">${escaparHTML(produtoExibicao)}</span>
+                            <span class="font-medium text-xs text-slate-100 block">${escaparHTML(item.produto)}</span>
                             ${badgeMarca}
                         </div>
                         <div class="flex items-center gap-2 mt-0.5">
