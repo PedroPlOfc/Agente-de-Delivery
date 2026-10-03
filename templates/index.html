@@ -18,17 +18,14 @@
 
     <div class="max-w-6xl mx-auto space-y-6">
         
-        <!-- CABEÇALHO COM O NOVO SÍMBOLO DO HERMES -->
+        <!-- CABEÇALHO -->
         <header class="flex justify-between items-center border-b border-slate-800 pb-4">
             <div class="flex items-center gap-3">
-                <!-- Ícone do Hermes (Raio Amarelo) -->
                 <div class="p-2.5 bg-slate-900 border border-amber-500/30 rounded-xl text-amber-400 shadow-lg shadow-amber-500/10 flex items-center justify-center w-12 h-12">
                     <svg viewBox="0 0 100 100" class="w-8 h-8 fill-amber-400">
-                        <!-- Traços de Velocidade -->
                         <rect x="10" y="38" width="40" height="6" rx="3" />
                         <rect x="20" y="47" width="35" height="6" rx="3" />
                         <rect x="25" y="56" width="20" height="6" rx="3" />
-                        <!-- Raio Hermes -->
                         <path d="M 85,25 L 35,35 L 55,50 L 35,55 L 85,45 L 50,80 L 60,58 L 85,25 Z" />
                     </svg>
                 </div>
@@ -49,10 +46,9 @@
         <!-- LAYOUT PRINCIPAL -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <!-- COLUNA ESQUERDA: SIMULADOR DE CHAT -->
+            <!-- SIMULADOR DE CHAT -->
             <div class="lg:col-span-7 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl h-[650px]">
                 
-                <!-- TOPBAR DO CHAT COM O ÍCONE DO HERMES -->
                 <div class="bg-slate-800/90 p-3 px-4 border-b border-slate-700/50 flex items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-slate-950 border border-amber-500/40 flex items-center justify-center p-1.5 shadow">
@@ -73,7 +69,6 @@
                         </div>
                     </div>
 
-                    <!-- DADOS DO CLIENTE (TESTE) -->
                     <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 px-3 rounded-lg border border-slate-700/60">
                         <i class="fa-solid fa-user text-xs text-slate-400"></i>
                         <input id="cliente-nome" type="text" value="Pedro Lucas" placeholder="Nome" class="bg-transparent text-xs w-24 text-slate-200 outline-none border-b border-transparent focus:border-amber-400">
@@ -83,20 +78,18 @@
                     </div>
                 </div>
 
-                <!-- ÁREA DE MENSAGENS -->
                 <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 chat-bg">
                     <div class="flex flex-col items-start max-w-[85%]">
                         <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none border border-slate-700/50 shadow text-sm space-y-1">
-                            <p>Olá! Sou o **Hermes**, seu assistente de compras! ⚡</p>
+                            <p>Olá! Sou o <strong>Hermes</strong>, seu assistente de compras! ⚡</p>
                             <p class="text-xs text-slate-400">Pode mandar sua lista de compras por aqui!</p>
                         </div>
                         <span class="text-[10px] text-slate-500 mt-1 ml-1">Hermes • Agora</span>
                     </div>
                 </div>
 
-                <!-- ÁREA DE DIGITAÇÃO -->
                 <form id="chat-form" onsubmit="enviarMensagemChat(event)" class="bg-slate-800/90 p-3 border-t border-slate-700/50 flex gap-2 items-center">
-                    <textarea id="input-mensagem" rows="1" placeholder="Digite seu pedido (ex: 2kg de arroz e 10 reais de queijo)..." 
+                    <textarea id="input-mensagem" rows="1" placeholder="Digite seu pedido..." 
                               class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 resize-none"
                               onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); enviarMensagemChat(event); }"></textarea>
                     
@@ -106,7 +99,7 @@
                 </form>
             </div>
 
-            <!-- COLUNA DIREITA: EXTRAÇÃO DE DADOS -->
+            <!-- EXTRAÇÃO DE DADOS -->
             <div class="lg:col-span-5 flex flex-col gap-4">
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
@@ -134,6 +127,218 @@
         </div>
     </div>
 
-    <!-- O RESTANTE DO TEU JS CONTINUA IGUAL -->
+    <script>
+    let listaGlobalItens = [];
+
+    async function enviarMensagemChat(event) {
+        event.preventDefault();
+
+        const input = document.getElementById('input-mensagem');
+        const mensagem = input.value.trim();
+        const nomeCliente = document.getElementById('cliente-nome').value.trim() || 'Cliente';
+        const telefoneCliente = document.getElementById('cliente-tel').value.trim() || '5581999999999';
+
+        if (!mensagem) return;
+
+        adicionarBalaoChat('cliente', mensagem, nomeCliente);
+        input.value = '';
+
+        const idTyping = adicionarTypingIndicator();
+        document.getElementById('loading-ia').classList.remove('hidden');
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/webhook/mercado', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    telefone: telefoneCliente, 
+                    mensagem: mensagem,
+                    itens_atuais: listaGlobalItens // Envia o contexto atual para o backend
+                })
+            });
+
+            const data = await response.json();
+            removerTypingIndicator(idTyping);
+
+            if (response.ok && data.status === "success") {
+                let lista = data.lista_separacao;
+
+                if (typeof lista === 'string') {
+                    lista = JSON.parse(lista);
+                }
+
+                // O backend agora retorna a lista final inteira atualizada
+                if (lista.itens) {
+                    listaGlobalItens = lista.itens;
+                }
+
+                adicionarBalaoChat('bot', lista.mensagem_resposta || gerarMensagemRespostaAcumulada(listaGlobalItens), 'Hermes');
+                atualizarPainelExtracao(lista);
+            } else {
+                adicionarBalaoChat('bot', '⚠️ Ocorreu um problema ao processar seu pedido. Pode enviar novamente?', 'Hermes');
+            }
+        } catch (err) {
+            console.error("Erro na conexão:", err);
+            removerTypingIndicator(idTyping);
+            adicionarBalaoChat('bot', '⚠️ Falha ao conectar com o servidor local.', 'Hermes');
+        } finally {
+            document.getElementById('loading-ia').classList.add('hidden');
+        }
+    }
+
+    function removerItemManual(index) {
+        listaGlobalItens.splice(index, 1);
+        atualizarPainelExtracao({ itens: listaGlobalItens });
+        adicionarBalaoChat('bot', '🗑️ Item removido da sua lista com sucesso!', 'Hermes');
+    }
+
+    function gerarMensagemRespostaAcumulada(itens) {
+        if (!itens || itens.length === 0) {
+            return "Sua lista de compras está vazia no momento. O que gostaria de adicionar?";
+        }
+
+        let textoItens = itens.map((i, index) => {
+            let qtdStr = `${i.quantidade} ${i.unidade_medida || 'un'}`;
+            if (i.unidade_medida === 'reais') qtdStr = `R$ ${i.quantidade.toFixed(2)}`;
+            
+            let nomeLimpo = i.produto.replace(/^(?:de\s+)?(?:\d+[\.,]?\d*)\s*(?:pct|un|kg|k|fardo|reais)?\s*(?:de\s+)?/i, '').trim();
+            if (!nomeLimpo) nomeLimpo = i.produto;
+
+            let marcaStr = i.marca_preferida ? ` (🏷️ ${i.marca_preferida})` : '';
+
+            return `${index + 1}. ${qtdStr} de ${nomeLimpo}${marcaStr}`;
+        }).join('\n');
+
+        return `Olá! Aqui está a sua lista atualizada:\n\n${textoItens}\n\n1️⃣ Está tudo certinho ou gostaria de alterar algo?\n2️⃣ Qual será a forma de pagamento?`;
+    }
+
+    function adicionarBalaoChat(tipo, texto, autor) {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (tipo === 'cliente') {
+            div.className = 'flex flex-col items-end max-w-[85%] ml-auto';
+            div.innerHTML = `
+                <div class="bg-emerald-700 text-white p-3 rounded-2xl rounded-tr-none shadow text-sm whitespace-pre-line">
+                    ${escaparHTML(texto)}
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1 mr-1">${escaparHTML(autor)} • ${hora}</span>
+            `;
+        } else {
+            div.className = 'flex flex-col items-start max-w-[85%]';
+            div.innerHTML = `
+                <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none border border-slate-700/50 shadow text-sm whitespace-pre-line">
+                    ${escaparHTML(texto)}
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1 ml-1">${escaparHTML(autor)} • ${hora}</span>
+            `;
+        }
+
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function adicionarTypingIndicator() {
+        const container = document.getElementById('chat-messages');
+        const id = 'typing-' + Date.now();
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'flex flex-col items-start max-w-[85%]';
+        div.innerHTML = `
+            <div class="bg-slate-800 text-slate-400 p-3 rounded-2xl rounded-tl-none border border-slate-700/50 text-xs flex items-center gap-1">
+                <i class="fa-solid fa-circle text-[8px] animate-bounce"></i>
+                <i class="fa-solid fa-circle text-[8px] animate-bounce delay-100"></i>
+                <i class="fa-solid fa-circle text-[8px] animate-bounce delay-200"></i>
+                <span class="ml-1">Hermes está digitando...</span>
+            </div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return id;
+    }
+
+    function removerTypingIndicator(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+
+    function limparNomeProduto(produto) {
+        if (!produto) return '';
+        let limpo = produto.replace(/(?:da marca|marca)\s+[a-zA-Z0-9áàâãéèêíïóôõöúçñÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇÑ]+/gi, '').trim();
+        return limpo || produto;
+    }
+
+    function atualizarPainelExtracao(lista) {
+        const container = document.getElementById('itens-container');
+        const badgePagamento = document.getElementById('badge-pagamento');
+        
+        container.innerHTML = '';
+
+        if (lista.forma_pagamento) {
+            badgePagamento.innerText = `Pagamento: ${lista.forma_pagamento}`;
+            badgePagamento.className = 'text-[11px] bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full border border-amber-500/20';
+        }
+
+        if (!lista.itens || lista.itens.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-slate-500 text-xs">
+                    Nenhum item na lista.
+                </div>
+            `;
+            return;
+        }
+
+        lista.itens.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 shadow-sm';
+            
+            let textoQtd = `${item.quantidade} ${item.unidade_medida || 'un'}`;
+            if (item.unidade_medida === 'reais') {
+                textoQtd = `R$ ${item.quantidade.toFixed(2)}`;
+            }
+
+            const produtoExibicao = limparNomeProduto(item.produto);
+
+            let badgeMarca = '';
+            if (item.marca_preferida) {
+                badgeMarca = `<span class="text-[10px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20 font-medium">🏷️ ${escaparHTML(item.marca_preferida)}</span>`;
+            }
+
+            div.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-xs text-slate-100 block">${escaparHTML(produtoExibicao)}</span>
+                            ${badgeMarca}
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-[11px] font-mono text-amber-400 font-semibold">${textoQtd}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] bg-slate-700/80 text-slate-300 px-2 py-0.5 rounded-md font-semibold border border-slate-600/50">
+                        ${escaparHTML(item.categoria || 'Outros')}
+                    </span>
+                    <button onclick="removerItemManual(${index})" title="Remover item" class="text-slate-500 hover:text-red-400 p-1 transition-colors">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function escaparHTML(str) {
+        return str ? str.replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+        }) : '';
+    }
+</script>
 </body>
 </html>

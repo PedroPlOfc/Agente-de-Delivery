@@ -1,6 +1,8 @@
 import os
 import json
 import re
+import time
+import difflib
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -10,34 +12,42 @@ load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=API_KEY) if API_KEY else None
 
+CATALOGO_PRODUTOS = [
+    "Arroz", "Feijão", "Feijão macassar", "Feijão preto", 
+    "Macarrão", "Cuscuz", "Queijo", "Queijo coalho", "Presunto", "Leite", 
+    "Coca-Cola", "Guaraná", "Miojo galinha caipira", "Detergente",
+    "Carne", "Frango", "Refrigerante", "Cerveja"
+]
+
 SYSTEM_INSTRUCTION = """
-Você é o Hermes, um assistente virtual inteligente e atencioso para um supermercado.
-Sua missão é realizar o atendimento de pedidos via WhatsApp de forma clara e objetiva.
+Você é o Hermes, um assistente virtual inteligente para um supermercado.
+Sua missão é manter e atualizar a lista de compras em conversas de delivery no WhatsApp.
 
-REGRAS DE CONDUÇÃO DA CONVERSA:
+REGRAS DE ATUALIZAÇÃO E EXTRAÇÃO:
+1. GERENCIAMENTO DE ESTADO: O usuário enviará a mensagem atual acompanhada do contexto dos "itens_atuais" da lista.
+   - Se o usuário disser "mudar o item 1 para 3kg de arroz" ou "trocar o 1...", substitua o item no índice 1 por 3kg de arroz na lista final.
+   - Se o usuário pedir para remover (ex: "remover o item 2" ou "tirar o feijão"), remova o item da lista.
+   - Se o usuário pedir novos itens (ex: "adicione 2kg de açúcar"), acrescente à lista existente.
+   - Se o item já existir e o usuário pedir mais quantidade sem especificar substituição, some/atualize a quantidade.
 
-1. PRIMEIRA INTERAÇÃO (Recebimento da Lista):
-   - Confirme o recebimento dos itens extraídos.
-   - Apresente a lista organizada ao cliente e pergunte se está tudo certo ou se ele deseja adicionar/remover algo.
+2. CORREÇÃO MALEÁVEL / CONTEXTUAL: Corrija automaticamente erros de digitação nos nomes dos produtos (Ex: "feijo" -> "Feijão", "arros" -> "Arroz", "miojo galinha caipiria" -> "Miojo galinha caipira").
+3. ISOLAMENTO DE MARCA: NUNCA inclua saudações, intenções ou termos como "da marca X" no nome do produto.
+4. NORMALIZAÇÃO DE UNIDADES:
+   - '2k', '2kg', '2 kilos', '2 kg' -> quantidade: 2.0, unidade_medida: 'kg'
+   - '10 reais' -> quantidade: 10.0, unidade_medida: 'reais'
+   - '2 pacotes', '2 pct' -> quantidade: 2.0, unidade_medida: 'pct'
+   - '2 fardos' -> quantidade: 2.0, unidade_medida: 'fardo'
+   - '2 unidades', '2 un' -> quantidade: 2.0, unidade_medida: 'un'
 
-2. SEGUNDA INTERAÇÃO (Confirmação dos Itens):
-   - Assim que o cliente confirmar a lista, pergunte sobre a forma de pagamento:
-     "Como prefere realizar o pagamento?"
-     Option A: Pelo aplicativo (Online/PIX).
-     Option B: Na entrega (Maquininha de Cartão ou Espécie/Dinheiro).
-   - Se for em Espécie/Dinheiro na entrega, pergunte se precisará de troco e para qual valor (ex: "Troco para R$ 100,00?").
-
-3. IDENTIFICAÇÃO DO CLIENTE:
-   - Extraia e utilize o nome informado pelo cliente se ele disser. O telefone já é identificado automaticamente pelo sistema.
+5. MENSAGEM AO CLIENTE: Retorne a lista resultante NUMERADA (1, 2, 3...) na mensagem_resposta.
 
 SAÍDA OBRIGATÓRIA (JSON):
-Retorne estritamente um JSON com a estrutura:
 {
-  "nome_cliente": "Nome do cliente se informado ou null",
-  "endereco_entrega": "Endereço se informado ou null",
+  "nome_cliente": null,
+  "endereco_entrega": null,
   "itens": [
     {
-      "produto": "Nome do produto",
+      "produto": "Nome Corrigido",
       "marca_preferida": null,
       "quantidade": 1.0,
       "unidade_medida": "un",
@@ -46,121 +56,112 @@ Retorne estritamente um JSON com a estrutura:
       "observacao": ""
     }
   ],
-  "forma_pagamento": "PIX / Cartão na entrega / Espécie (Troco para R$ X) / Pelo aplicativo / A definir",
+  "forma_pagamento": "A definir",
   "duvida_ou_incompleto": false,
-  "mensagem_resposta": "Texto amigável formatado para envio no WhatsApp"
+  "mensagem_resposta": "Mensagem formatada com itens numerados para o cliente"
 }
-"""     
+"""
 
-def extrair_itens_inteligente(texto: str) -> list:
-    linhas = [l.strip() for l in texto.split("\n") if l.strip()]
-    itens = []
+def corrigir_produto_fuzzy(termo_digitado: str) -> str:
+    termo_clean = termo_digitado.strip().capitalize()
+    correspondencias = difflib.get_close_matches(termo_clean, CATALOGO_PRODUTOS, n=1, cutoff=0.55)
+    return correspondencias[0] if correspondencias else termo_clean
 
-    mapeamento_categorias = {
-        "arroz": "Mercearia",
-        "feijão": "Mercearia",
-        "feijao": "Mercearia",
-        "macarrão": "Mercearia",
-        "macarrao": "Mercearia",
-        "queijo": "Laticínios e Frios",
-        "presunto": "Laticínios e Frios",
-        "leite": "Laticínios e Frios",
-        "coca": "Bebidas",
-        "cerveja": "Bebidas",
-        "refrigerante": "Bebidas",
-        "carne": "Açougue",
-        "frango": "Açougue",
-        "detergente": "Limpeza e Higiene",
-        "sabão": "Limpeza e Higiene",
-    }
 
-    # Dicionário de padronização de unidades
-    depara_unidades = {
-        "kg": "kg",
-        "k": "kg",
-        "g": "g",
-        "reais": "reais",
-        "real": "reais",
-        "fardos": "fardo",
-        "fardo": "fardo",
-        "pacotes": "pct",
-        "pacote": "pct",
-        "pct": "pct",
-        "caixas": "cx",
-        "caixa": "cx",
-        "unidades": "un",
-        "unidade": "un",
-        "un": "un",
-    }
+def extrair_itens_inteligente(texto: str, itens_existentes: list = None) -> list:
+    if itens_existentes is None:
+        itens_existentes = []
 
-    for linha in linhas:
-        linha_lower = linha.lower()
+    lista_resultado = [dict(item) for item in itens_existentes]
+    texto_processado = re.sub(r'(\d+(?:[\.,]\d+)?)\s*(?:kg|kilos|kilo|k)\b', r'\1 kg', texto, flags=re.IGNORECASE)
+
+    # Detecta comando de troca/substituição por índice (Ex: "mudar o item 1 para 3kg de arroz")
+    match_troca = re.search(r'(?:trocar|mudar|alterar)\s+(?:o\s+)?(?:item\s+)?(\d+)\s+(?:para|por)?\s*(.*)', texto_processado, re.IGNORECASE)
+    
+    if match_troca and lista_resultado:
+        idx_alvo = int(match_troca.group(1)) - 1
+        conteudo_novo = match_troca.group(2).strip()
+
+        if 0 <= idx_alvo < len(lista_resultado) and conteudo_novo:
+            qtd_m = re.search(r'(\d+(?:[\.,]\d+)?)', conteudo_novo)
+            qtd = float(qtd_m.group(1).replace(',', '.')) if qtd_m else 1.0
+            
+            unid_m = re.search(r'\b(kg|g|reais|fardos|fardo|pacotes|pct|caixas|cx|unidades|un)\b', conteudo_novo, re.IGNORECASE)
+            unid = unid_m.group(1).lower() if unid_m else "un"
+            if unid in ["kilos", "kilo", "k"]: unid = "kg"
+            if unid in ["pacotes", "pacote"]: unid = "pct"
+
+            prod_nome = re.sub(r'^\d+(?:[\.,]\d+)?\s*(?:kg|g|reais|fardos|fardo|pct|un)?\s*(?:de)?\s*', '', conteudo_novo, flags=re.IGNORECASE).strip()
+            prod_nome = corrigir_produto_fuzzy(prod_nome) if prod_nome else lista_resultado[idx_alvo]["produto"]
+
+            lista_resultado[idx_alvo] = {
+                "produto": prod_nome,
+                "marca_preferida": lista_resultado[idx_alvo].get("marca_preferida"),
+                "quantidade": qtd,
+                "unidade_medida": unid,
+                "categoria": lista_resultado[idx_alvo].get("categoria", "Mercearia"),
+                "aceita_substituicao": True,
+                "observacao": ""
+            }
+            return lista_resultado
+
+    # Se não for comando de troca direta, processa extração padrão
+    linhas_brutas = texto_processado.split("\n")
+    clausulas = []
+    for linha in linhas_brutas:
+        if not linha.strip(): continue
+        partes = re.split(r'[,;]|\salém de\s|\se também\s|\se ainda\s|\se\s', linha, flags=re.IGNORECASE)
+        clausulas.extend([p.strip() for p in partes if p.strip()])
+
+    depara_unidades = {"kg": "kg", "g": "g", "reais": "reais", "fardos": "fardo", "fardo": "fardo", "pacotes": "pct", "pct": "pct", "unidades": "un", "un": "un"}
+
+    for trecho in clausulas:
+        trecho_limpo = re.sub(r'^(?:bom dia|boa tarde|boa noite|eu gostaria de|gostaria de|gostaria|quero|por favor)?\s*', '', trecho, flags=re.IGNORECASE).strip()
+        qtd_match = re.search(r'(\d+(?:[\.,]\d+)?)', trecho_limpo)
+        if not qtd_match: continue
         
-        # 1. Extrai a quantidade numérica (ex: 2, 10, 1.5)
-        qtd_match = re.search(r'(\d+(?:[\.,]\d+)?)', linha)
-        qtd = float(qtd_match.group(1).replace(',', '.')) if qtd_match else 1.0
+        qtd = float(qtd_match.group(1).replace(',', '.'))
+        unid_match = re.search(r'\b(kg|g|reais|real|fardos|fardo|pacotes|pct|unidades|un)\b', trecho_limpo.lower())
+        unid_encontrada = depara_unidades.get(unid_match.group(1), "un") if unid_match else "un"
 
-        # 2. Captura a unidade mesmo grudada no número (ex: 2kg, 3pacotes, 5unidades)
-        unid_match = re.search(r'(kg|k|g|fardos|fardo|reais|real|pacotes|pacote|pct|caixas|caixa|unidades|unidade|un)', linha_lower)
-        if unid_match:
-            termo_encontrado = unid_match.group(1)
-            unid_encontrada = depara_unidades.get(termo_encontrado, "un")
-        else:
-            unid_encontrada = "un"
+        nome_prod = re.sub(r'^\d+(?:[\.,]\d+)?\s*(?:kg|g|reais|fardos|fardo|pct|un)?\s*(?:de)?\s*', '', trecho_limpo, flags=re.IGNORECASE).strip()
+        nome_prod = re.sub(r'^(?:de|da|do)\s+', '', nome_prod, flags=re.IGNORECASE).strip()
+        nome_prod = corrigir_produto_fuzzy(nome_prod) if nome_prod else ""
 
-        # 3. Mapeia a categoria do produto
-        cat_encontrada = "Outros"
-        for palavra_chave, cat in mapeamento_categorias.items():
-            if palavra_chave in linha_lower:
-                cat_encontrada = cat
-                break
+        if not nome_prod: continue
 
-        # 4. Limpa o nome do produto removendo a quantidade e a unidade do início
-        nome_produto = re.sub(
-            r'^\d+\s*(?:kg|k|g|fardos|fardo|reais|real|un|unidades|unidade|pacotes|pacote|pct|caixas|caixa)?\s*(?:de)?\s*', 
-            '', 
-            linha, 
-            flags=re.IGNORECASE
-        ).strip()
-        
-        if not nome_produto:
-            nome_produto = linha
-
-        itens.append({
-            "produto": nome_produto.capitalize(),
+        # Atualiza se já existe ou adiciona novo
+        idx_existente = next((i for i, item in enumerate(lista_resultado) if item["produto"].lower() == nome_prod.lower()), -1)
+        novo_obj = {
+            "produto": nome_prod,
             "marca_preferida": None,
             "quantidade": qtd,
             "unidade_medida": unid_encontrada,
-            "categoria": cat_encontrada,
+            "categoria": "Mercearia",
             "aceita_substituicao": True,
             "observacao": ""
-        })
+        }
+        if idx_existente != -1:
+            lista_resultado[idx_existente] = novo_obj
+        else:
+            lista_resultado.append(novo_obj)
 
-    return itens if itens else [{
-        "produto": texto[:30],
-        "marca_preferida": None,
-        "quantidade": 1.0,
-        "unidade_medida": "un",
-        "categoria": "Outros",
-        "aceita_substituicao": True,
-        "observacao": ""
-    }]
+    return lista_resultado
 
 
-def gerar_resposta_local(texto_mensagem: str) -> str:
-    itens = extrair_itens_inteligente(texto_mensagem)
+def gerar_resposta_local(texto_mensagem: str, itens_existentes: list = None) -> str:
+    itens = extrair_itens_inteligente(texto_mensagem, itens_existentes)
     
-    # Formata a lista de itens para a mensagem de confirmação do WhatsApp
     lista_formatada = "\n".join([
-        f"• {item['quantidade']} {item['unidade_medida']} de {item['produto']}" 
-        for item in itens
+        f"{idx + 1}. {item['quantidade']} {item['unidade_medida']} de {item['produto']}" 
+        for idx, item in enumerate(itens)
     ])
 
     mensagem_whatsapp = (
-        f"Olá! Recebi o seu pedido:\n\n"
+        f"Olá! Aqui está a sua lista atualizada:\n\n"
         f"{lista_formatada}\n\n"
         f"1️⃣ Está tudo certinho com a sua lista ou gostaria de alterar algo?\n"
-        f"2️⃣ Qual será a forma de pagamento? (Pelo aplicativo ou na entrega em cartão/espécie com troco?)"
+        f"2️⃣ Qual será a forma de pagamento?"
     )
 
     mock_data = {
@@ -174,23 +175,47 @@ def gerar_resposta_local(texto_mensagem: str) -> str:
     return json.dumps(mock_data, ensure_ascii=False)
 
 
-def chamar_gemini(texto_mensagem: str) -> str:
-    """Processa o pedido via API Gemini ou via Engine Local do Hermes em caso de falha."""
+def chamar_gemini(texto_mensagem: str, itens_existentes: list = None) -> str:
+    if itens_existentes is None:
+        itens_existentes = []
+
     if not client:
-        return gerar_resposta_local(texto_mensagem)
+        return gerar_resposta_local(texto_mensagem, itens_existentes)
 
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         response_mime_type="application/json"
     )
     
-    try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=f"Extraia a lista de compras: {texto_mensagem}",
-            config=config
-        )
-        return response.text
-    except Exception as e:
-        print(f"⚠️ API externa indisponível ({e}). Executando via Engine Local Hermes...")
-        return gerar_resposta_local(texto_mensagem)
+    prompt = f"""
+    Lista de itens atuais do cliente no carrinho:
+    {json.dumps(itens_existentes, ensure_ascii=False)}
+
+    Nova mensagem do cliente:
+    "{texto_mensagem}"
+
+    Atualize a lista de compras de acordo com o pedido do cliente e retorne a lista final completa no JSON.
+    """
+
+    modelo_ativo = "gemini-3.8-flash"
+    max_tentativas = 3
+    tempo_espera = 1.5
+
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            response = client.models.generate_content(
+                model=modelo_ativo,
+                contents=prompt,
+                config=config
+            )
+            return response.text
+        except Exception as e:
+            erro_str = str(e)
+            if "503" in erro_str or "UNAVAILABLE" in erro_str:
+                if tentativa < max_tentativas:
+                    time.sleep(tempo_espera)
+                    tempo_espera *= 1.5
+                    continue
+            break
+
+    return gerar_resposta_local(texto_mensagem, itens_existentes)
