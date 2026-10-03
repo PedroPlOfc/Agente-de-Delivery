@@ -11,10 +11,46 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=API_KEY) if API_KEY else None
 
 SYSTEM_INSTRUCTION = """
-Você é o Hermes, um assistente virtual de inteligência artificial para um supermercado.
-Analise o pedido do cliente e extraia os itens rigorosamente no formato JSON.
-Categorias permitidas: Açougue, Laticínios e Frios, Hortifruti, Mercearia, Bebidas, Limpeza e Higiene, Outros.
-"""
+Você é o Hermes, um assistente virtual inteligente e atencioso para um supermercado.
+Sua missão é realizar o atendimento de pedidos via WhatsApp de forma clara e objetiva.
+
+REGRAS DE CONDUÇÃO DA CONVERSA:
+
+1. PRIMEIRA INTERAÇÃO (Recebimento da Lista):
+   - Confirme o recebimento dos itens extraídos.
+   - Apresente a lista organizada ao cliente e pergunte se está tudo certo ou se ele deseja adicionar/remover algo.
+
+2. SEGUNDA INTERAÇÃO (Confirmação dos Itens):
+   - Assim que o cliente confirmar a lista, pergunte sobre a forma de pagamento:
+     "Como prefere realizar o pagamento?"
+     Option A: Pelo aplicativo (Online/PIX).
+     Option B: Na entrega (Maquininha de Cartão ou Espécie/Dinheiro).
+   - Se for em Espécie/Dinheiro na entrega, pergunte se precisará de troco e para qual valor (ex: "Troco para R$ 100,00?").
+
+3. IDENTIFICAÇÃO DO CLIENTE:
+   - Extraia e utilize o nome informado pelo cliente se ele disser. O telefone já é identificado automaticamente pelo sistema.
+
+SAÍDA OBRIGATÓRIA (JSON):
+Retorne estritamente um JSON com a estrutura:
+{
+  "nome_cliente": "Nome do cliente se informado ou null",
+  "endereco_entrega": "Endereço se informado ou null",
+  "itens": [
+    {
+      "produto": "Nome do produto",
+      "marca_preferida": null,
+      "quantidade": 1.0,
+      "unidade_medida": "un",
+      "categoria": "Mercearia",
+      "aceita_substituicao": true,
+      "observacao": ""
+    }
+  ],
+  "forma_pagamento": "PIX / Cartão na entrega / Espécie (Troco para R$ X) / Pelo aplicativo / A definir",
+  "duvida_ou_incompleto": false,
+  "mensagem_resposta": "Texto amigável formatado para envio no WhatsApp"
+}
+"""     
 
 def extrair_itens_inteligente(texto: str) -> list:
     linhas = [l.strip() for l in texto.split("\n") if l.strip()]
@@ -113,12 +149,27 @@ def extrair_itens_inteligente(texto: str) -> list:
 
 def gerar_resposta_local(texto_mensagem: str) -> str:
     itens = extrair_itens_inteligente(texto_mensagem)
+    
+    # Formata a lista de itens para a mensagem de confirmação do WhatsApp
+    lista_formatada = "\n".join([
+        f"• {item['quantidade']} {item['unidade_medida']} de {item['produto']}" 
+        for item in itens
+    ])
+
+    mensagem_whatsapp = (
+        f"Olá! Recebi o seu pedido:\n\n"
+        f"{lista_formatada}\n\n"
+        f"1️⃣ Está tudo certinho com a sua lista ou gostaria de alterar algo?\n"
+        f"2️⃣ Qual será a forma de pagamento? (Pelo aplicativo ou na entrega em cartão/espécie com troco?)"
+    )
+
     mock_data = {
-        "nome_cliente": "Cliente Hermes",
+        "nome_cliente": None,
         "endereco_entrega": None,
         "itens": itens,
+        "forma_pagamento": "A definir",
         "duvida_ou_incompleto": False,
-        "mensagem_resposta": f"Olá! Recebi seu pedido com {len(itens)} item(ns) e já enviei para a equipe de separação do mercado!"
+        "mensagem_resposta": mensagem_whatsapp
     }
     return json.dumps(mock_data, ensure_ascii=False)
 
