@@ -3,70 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projeto Hermes - Painel de Testes</title>
+    <title>Projeto Hermes — Simulator WhatsApp</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .chat-bg {
+            background-color: #0b141a;
+            background-image: radial-gradient(#111b21 1px, transparent 0);
+            background-size: 16px 16px;
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
-    <div class="max-w-5xl mx-auto space-y-6">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto space-y-6">
         
-        <header class="flex items-center justify-between border-b border-slate-700 pb-4">
-            <div>
-                <h1 class="text-3xl font-bold text-amber-400">⚡ Projeto Hermes</h1>
-                <p class="text-slate-400 text-sm">Agente de IA para Delivery & Automação de Supermercados</p>
+        <!-- CABEÇALHO -->
+        <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-slate-900 border border-amber-500/30 rounded-xl text-amber-400 shadow-lg shadow-amber-500/10 flex items-center justify-center w-12 h-12">
+                    <svg viewBox="0 0 100 100" class="w-8 h-8 fill-amber-400">
+                        <rect x="10" y="38" width="40" height="6" rx="3" />
+                        <rect x="20" y="47" width="35" height="6" rx="3" />
+                        <rect x="25" y="56" width="20" height="6" rx="3" />
+                        <path d="M 85,25 L 35,35 L 55,50 L 35,55 L 85,45 L 50,80 L 60,58 L 85,25 Z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
+                        Projeto Hermes
+                        <span class="text-amber-400 text-xs font-mono bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">Fast Delivery</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Simulador de Atendimento e Extração Adaptável com IA</p>
+                </div>
             </div>
-            <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30">
-                ● Gemini + FastAPI
+            <span class="px-3 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Bot Ativo
             </span>
         </header>
 
-        <!-- Main Content -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- LAYOUT PRINCIPAL -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <!-- Card de Envio -->
-            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
-                <h2 class="text-xl font-semibold text-slate-200">Simular Pedido de Cliente</h2>
+            <!-- SIMULADOR DE CHAT -->
+            <div class="lg:col-span-7 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl h-[650px]">
                 
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1">Telefone do Cliente</label>
-                    <input id="telefone" type="text" value="5581999999999" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-400">
-                </div>
-
-                <div>
-                    <label class="block text-sm text-slate-400 mb-1">Mensagem do Pedido</label>
-                    <textarea id="mensagem" rows="6" placeholder="Ex: Quero 2kg de acém, 10 reais de queijo e 2 fardos de coca..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-400">2kg de arroz
-2kg de feijão
-2 pacotes de macarrão
-10 reais de queijo
-2 fardos de coca cola zero</textarea>
-                </div>
-
-                <button onclick="enviarPedido()" id="btn-enviar" class="w-full bg-amber-500 hover:bg-amber-600 font-bold py-3 px-4 rounded-lg text-slate-950 transition-colors flex justify-center items-center gap-2">
-                    <span>Processar Pedido com Hermes</span>
-                </button>
-            </div>
-
-            <!-- Card de Resultado -->
-            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4 flex flex-col">
-                <h2 class="text-xl font-semibold text-slate-200">Resultado da IA</h2>
-                
-                <div id="loading" class="hidden flex-1 flex flex-col items-center justify-center py-10 space-y-3">
-                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-400"></div>
-                    <p class="text-sm text-slate-400">Hermes está processando com o Gemini...</p>
-                </div>
-
-                <div id="resultado-vazio" class="flex-1 flex items-center justify-center border-2 border-dashed border-slate-700 rounded-lg p-6 text-slate-500 text-sm text-center">
-                    Aguardando o envio de um pedido para exibir a separação estruturada.
-                </div>
-
-                <div id="resultado-container" class="hidden space-y-4 overflow-y-auto max-h-[500px]">
-                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
-                        <h3 class="text-xs uppercase font-bold text-amber-400 mb-2">Mensagem de Resposta (WhatsApp)</h3>
-                        <p id="msg-resposta" class="text-slate-300 text-sm whitespace-pre-line"></p>
+                <div class="bg-slate-800/90 p-3 px-4 border-b border-slate-700/50 flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-slate-950 border border-amber-500/40 flex items-center justify-center p-1.5 shadow">
+                            <svg viewBox="0 0 100 100" class="w-full h-full fill-amber-400">
+                                <rect x="10" y="38" width="40" height="6" rx="3" />
+                                <rect x="20" y="47" width="35" height="6" rx="3" />
+                                <rect x="25" y="56" width="20" height="6" rx="3" />
+                                <path d="M 85,25 L 35,35 L 55,50 L 35,55 L 85,45 L 50,80 L 60,58 L 85,25 Z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
+                                Hermes Supermercados
+                            </h2>
+                            <p class="text-[11px] text-emerald-400 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> online
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
-                        <h3 class="text-xs uppercase font-bold text-emerald-400 mb-3">Lista de Separação Categorizada</h3>
-                        <div id="itens-categorizados" class="space-y-3 text-sm"></div>
+                    <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 px-3 rounded-lg border border-slate-700/60">
+                        <i class="fa-solid fa-user text-xs text-slate-400"></i>
+                        <input id="cliente-nome" type="text" value="Pedro Lucas" placeholder="Nome" class="bg-transparent text-xs w-24 text-slate-200 outline-none border-b border-transparent focus:border-amber-400">
+                        <span class="text-slate-600">|</span>
+                        <i class="fa-solid fa-phone text-xs text-slate-400"></i>
+                        <input id="cliente-tel" type="text" value="5581999999999" placeholder="Telefone" class="bg-transparent text-xs w-28 text-slate-200 outline-none border-b border-transparent focus:border-amber-400">
+                    </div>
+                </div>
+
+                <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3 chat-bg">
+                    <div class="flex flex-col items-start max-w-[85%]">
+                        <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none border border-slate-700/50 shadow text-sm space-y-1">
+                            <p>Olá! Sou o <strong>Hermes</strong>, seu assistente de compras! ⚡</p>
+                            <p class="text-xs text-slate-400">Pode mandar sua lista de compras por aqui!</p>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 ml-1">Hermes • Agora</span>
+                    </div>
+                </div>
+
+                <form id="chat-form" onsubmit="enviarMensagemChat(event)" class="bg-slate-800/90 p-3 border-t border-slate-700/50 flex gap-2 items-center">
+                    <textarea id="input-mensagem" rows="1" placeholder="Digite seu pedido..." 
+                              class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 resize-none"
+                              onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); enviarMensagemChat(event); }"></textarea>
+                    
+                    <button type="submit" id="btn-send" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold p-3 rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center">
+                        <i class="fa-solid fa-paper-plane text-sm"></i>
+                    </button>
+                </form>
+            </div>
+
+            <!-- EXTRAÇÃO DE DADOS -->
+            <div class="lg:col-span-5 flex flex-col gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-amber-400"></i> Extração do Hermes
+                        </h3>
+                        <span id="badge-pagamento" class="text-[11px] bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700">
+                            Pagamento: A definir
+                        </span>
+                    </div>
+
+                    <div id="itens-container" class="space-y-2 flex-1 overflow-y-auto max-h-[350px]">
+                        <div class="text-center py-12 text-slate-500 text-xs">
+                            <i class="fa-solid fa-basket-shopping text-3xl mb-2 block text-slate-700"></i>
+                            Aguardando o envio do primeiro pedido...
+                        </div>
+                    </div>
+
+                    <div id="loading-ia" class="hidden text-center py-4 text-amber-400 text-xs flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-circle-notch animate-spin"></i> Processando com IA...
                     </div>
                 </div>
             </div>
@@ -75,77 +128,215 @@
     </div>
 
     <script>
-        async function enviarPedido() {
-    const telefone = document.getElementById('telefone').value;
-    const mensagem = document.getElementById('mensagem').value;
-    const btn = document.getElementById('btn-enviar');
-    const loading = document.getElementById('loading');
-    const resultadoVazio = document.getElementById('resultado-vazio');
-    const resultadoContainer = document.getElementById('resultado-container');
+    let listaGlobalItens = [];
 
-    if (!mensagem.trim()) {
-        alert('Digite uma mensagem antes de enviar!');
-        return;
+    function formatarQtdFormatada(qtd) {
+        const num = parseFloat(qtd);
+        if (isNaN(num)) return qtd;
+        return Number.isInteger(num) ? num.toString() : num.toFixed(2);
     }
 
-    btn.disabled = true;
-    loading.classList.remove('hidden');
-    resultadoVazio.classList.add('hidden');
-    resultadoContainer.classList.add('hidden');
+    async function enviarMensagemChat(event) {
+        event.preventDefault();
 
-    // Detecta o hostname atual de quem abriu a página (localhost, IP local ou domínio) e força a porta 8000 do FastAPI
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname || 'localhost';
-    const baseUrl = `${protocol}//${hostname}:8000`;
+        const input = document.getElementById('input-mensagem');
+        const mensagem = input.value.trim();
+        const nomeCliente = document.getElementById('cliente-nome').value.trim() || 'Cliente';
+        const telefoneCliente = document.getElementById('cliente-tel').value.trim() || '5581999999999';
 
-    try {
-        const response = await fetch(`${baseUrl}/webhook/mercado`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telefone, mensagem })
-        });
+        if (!mensagem) return;
 
-        const data = await response.json();
+        adicionarBalaoChat('cliente', mensagem, nomeCliente);
+        input.value = '';
 
-        if (response.ok) {
-            const lista = data.lista_separacao;
-            document.getElementById('msg-resposta').innerText = lista.mensagem_resposta;
+        const idTyping = adicionarTypingIndicator();
+        document.getElementById('loading-ia').classList.remove('hidden');
 
-            const containerItens = document.getElementById('itens-categorizados');
-            containerItens.innerHTML = '';
-
-            lista.itens.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700';
-                
-                let textoQuantidade = `${item.quantidade} ${item.unidade_medida || 'un'}`;
-                if (item.unidade_medida && item.unidade_medida.toLowerCase().includes('real')) {
-                    textoQuantidade = `R$ ${item.quantidade.toFixed(2)}`;
-                }
-
-                div.innerHTML = `
-                    <div>
-                        <span class="font-medium text-slate-100 block">${item.produto}</span>
-                        <span class="text-xs font-mono text-amber-400">${textoQuantidade}</span>
-                    </div>
-                    <span class="text-xs bg-slate-700 text-slate-300 px-2.5 py-1 rounded-full border border-slate-600 font-semibold">${item.categoria || 'Outros'}</span>
-                `;
-                containerItens.appendChild(div);
+        try {
+            const response = await fetch('http://127.0.0.1:8000/webhook/mercado', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    telefone: telefoneCliente, 
+                    mensagem: mensagem,
+                    itens_atuais: listaGlobalItens
+                })
             });
 
-            resultadoContainer.classList.remove('hidden');
-        } else {
-            alert('Erro no processamento: ' + JSON.stringify(data));
-            resultadoVazio.classList.remove('hidden');
+            const data = await response.json();
+            removerTypingIndicator(idTyping);
+
+            if (response.ok && data.status === "success") {
+                let lista = data.lista_separacao;
+
+                if (typeof lista === 'string') {
+                    lista = JSON.parse(lista);
+                }
+
+                // O estado do carrinho é atualizado 100% via resposta da IA
+                if (lista.itens) {
+                    listaGlobalItens = lista.itens;
+                }
+
+                adicionarBalaoChat('bot', lista.mensagem_resposta || gerarMensagemRespostaFallback(listaGlobalItens), 'Hermes');
+                atualizarPainelExtracao(lista);
+            } else {
+                adicionarBalaoChat('bot', '⚠️ Ocorreu um problema ao processar seu pedido. Pode enviar novamente?', 'Hermes');
+            }
+        } catch (err) {
+            console.error("Erro na conexão:", err);
+            removerTypingIndicator(idTyping);
+            adicionarBalaoChat('bot', '⚠️ Falha ao conectar com o servidor local.', 'Hermes');
+        } finally {
+            document.getElementById('loading-ia').classList.add('hidden');
         }
-    } catch (err) {
-        alert('Falha ao comunicar com o servidor: ' + err.message);
-        resultadoVazio.classList.remove('hidden');
-    } finally {
-        btn.disabled = false;
-        loading.classList.add('hidden');
     }
-}
-    </script>
+
+    function removerItemManual(index) {
+        listaGlobalItens.splice(index, 1);
+        atualizarPainelExtracao({ itens: listaGlobalItens });
+        adicionarBalaoChat('bot', gerarMensagemRespostaFallback(listaGlobalItens), 'Hermes');
+    }
+
+    function gerarMensagemRespostaFallback(itens) {
+        if (!itens || itens.length === 0) {
+            return "Sua lista de compras está vazia no momento. O que gostaria de adicionar?";
+        }
+
+        let textoItens = itens.map((i, index) => {
+            let qtdDisplay = formatarQtdFormatada(i.quantidade);
+            let qtdStr = `${qtdDisplay} ${i.unidade_medida || 'un'}`;
+            if (i.unidade_medida === 'reais') qtdStr = `R$ ${parseFloat(i.quantidade).toFixed(2)}`;
+            
+            let marcaStr = i.marca_preferida ? ` (🏷️ ${i.marca_preferida})` : '';
+
+            return `${index + 1}. ${qtdStr} de ${i.produto}${marcaStr}`;
+        }).join('\n');
+
+        return `Olá! Aqui está a sua lista atualizada:\n\n${textoItens}\n\n1️⃣ Está tudo certinho ou gostaria de alterar algo?\n2️⃣ Qual será a forma de pagamento?`;
+    }
+
+    function adicionarBalaoChat(tipo, texto, autor) {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (tipo === 'cliente') {
+            div.className = 'flex flex-col items-end max-w-[85%] ml-auto';
+            div.innerHTML = `
+                <div class="bg-emerald-700 text-white p-3 rounded-2xl rounded-tr-none shadow text-sm whitespace-pre-line">
+                    ${escaparHTML(texto)}
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1 mr-1">${escaparHTML(autor)} • ${hora}</span>
+            `;
+        } else {
+            div.className = 'flex flex-col items-start max-w-[85%]';
+            div.innerHTML = `
+                <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none border border-slate-700/50 shadow text-sm whitespace-pre-line">
+                    ${escaparHTML(texto)}
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1 ml-1">${escaparHTML(autor)} • ${hora}</span>
+            `;
+        }
+
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function adicionarTypingIndicator() {
+        const container = document.getElementById('chat-messages');
+        const id = 'typing-' + Date.now();
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'flex flex-col items-start max-w-[85%]';
+        div.innerHTML = `
+            <div class="bg-slate-800 text-slate-400 p-3 rounded-2xl rounded-tl-none border border-slate-700/50 text-xs flex items-center gap-1">
+                <i class="fa-solid fa-circle text-[8px] animate-bounce"></i>
+                <i class="fa-solid fa-circle text-[8px] animate-bounce delay-100"></i>
+                <i class="fa-solid fa-circle text-[8px] animate-bounce delay-200"></i>
+                <span class="ml-1">Hermes está digitando...</span>
+            </div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return id;
+    }
+
+    function removerTypingIndicator(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+
+    function atualizarPainelExtracao(lista) {
+        const container = document.getElementById('itens-container');
+        const badgePagamento = document.getElementById('badge-pagamento');
+        
+        container.innerHTML = '';
+
+        if (lista.forma_pagamento) {
+            badgePagamento.innerText = `Pagamento: ${lista.forma_pagamento}`;
+            badgePagamento.className = 'text-[11px] bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full border border-amber-500/20';
+        }
+
+        if (!lista.itens || lista.itens.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-slate-500 text-xs">
+                    Nenhum item na lista.
+                </div>
+            `;
+            return;
+        }
+
+        lista.itens.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 shadow-sm';
+            
+            let qtdDisplay = formatarQtdFormatada(item.quantidade);
+            let textoQtd = `${qtdDisplay} ${item.unidade_medida || 'un'}`;
+            if (item.unidade_medida === 'reais') {
+                textoQtd = `R$ ${parseFloat(item.quantidade).toFixed(2)}`;
+            }
+
+            let badgeMarca = '';
+            // Exibe a marca apenas se ela for diferente do nome do produto
+            if (item.marca_preferida && item.marca_preferida.toLowerCase() !== item.produto.toLowerCase()) {
+                badgeMarca = `<span class="text-[10px] bg-amber-500/10 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/20 font-medium">🏷️ ${escaparHTML(item.marca_preferida)}</span>`;
+            }
+
+            div.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-xs text-slate-100 block">${escaparHTML(item.produto)}</span>
+                            ${badgeMarca}
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-[11px] font-mono text-amber-400 font-semibold">${textoQtd}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] bg-slate-700/80 text-slate-300 px-2 py-0.5 rounded-md font-semibold border border-slate-600/50">
+                        ${escaparHTML(item.categoria || 'Outros')}
+                    </span>
+                    <button onclick="removerItemManual(${index})" title="Remover item" class="text-slate-500 hover:text-red-400 p-1 transition-colors">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function escaparHTML(str) {
+        return str ? str.replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+        }) : '';
+    }
+</script>
 </body>
 </html>
