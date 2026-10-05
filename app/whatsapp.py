@@ -13,7 +13,9 @@ def enviar_mensagem_whatsapp(numero: str, texto: str) -> None:
         "options": {"delay": 1200, "presence": "composing"},
         "textMessage": {"text": texto}
     }
+
     try:
-        requests.post(url, json=payload, headers=headers, timeout=10)
+        resposta = requests.post(url, json=payload, headers=headers, timeout=30)
+        resposta.raise_for_status()
     except Exception as e:
         print(f"Erro ao enviar mensagem via WhatsApp: {e}")

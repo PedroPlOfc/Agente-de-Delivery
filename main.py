@@ -8,6 +8,9 @@ from app.services import chamar_gemini
 from app.whatsapp import enviar_mensagem_whatsapp
 
 app = FastAPI(title="Projeto Hermes - Agente de Delivery")
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 # --- HABILITAÇÃO DO CORS PARA O LIVE SERVER E PAINEL ---
 app.add_middleware(
@@ -75,6 +78,8 @@ async def webhook_whatsapp(request: Request):
                 return {"status": "ignored"}
                 
             remote_jid = key.get("remoteJid", "")
+            
+            if remote_jid.endswith("@g.us") or remote_jid == "status@broadcast":return {"status": "ignored"}
             numero_cliente = remote_jid.split("@")[0]
             
             mensagem_texto = (
