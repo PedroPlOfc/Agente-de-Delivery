@@ -10,7 +10,10 @@ from google.genai import types
 load_dotenv()
 
 API_KEY = os.getenv("GEMINI_API_KEY")
-MODELO_OFICIAL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+# Modelo primário e secundários para cascata de resiliência
+MODELO_PRIMARIO = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODELOS_CASCATA = [MODELO_PRIMARIO, "gemini-2.0-flash", "gemini-1.5-flash"]
 
 client = genai.Client(api_key=API_KEY) if API_KEY else None
 
@@ -220,17 +223,32 @@ def chamar_gemini(texto_mensagem: str, itens_existentes: list = None) -> str:
     Processe a intenção do cliente, atualize o carrinho e retorne o JSON final completo.
     """
 
-    try:
-        response = client.models.generate_content(
-            model=MODELO_OFICIAL,
-            contents=prompt,
-            config=config
-        )
-        if response.text:
-            json_limpo = limpar_resposta_json(response.text)
-            json.loads(json_limpo)
-            return json_limpo
-    except Exception as e:
-        print(f"⚠️ Chamada via API Gemini ({MODELO_OFICIAL}) falhou: {e}. Executando via motor de fallback local...")
+    # Tenta cascata de modelos com re-tentativas automáticas para erros 503/UNAVAILABLE
+    for modelo in MODELOS_CASCATA:
+        max_retries = 3
+        backoff_sec = 1.0
 
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = client.models.generate_content(
+                    model=modelo,
+                    contents=prompt,
+                    config=config
+                )
+                if response.text:
+                    json_limpo = limpar_resposta_json(response.text)
+                    json.loads(json_limpo)
+                    return json_limpo
+            except Exception as e:
+                erro_msg = str(e)
+                # Trata erros temporários de sobrecarga (503 / UNAVAILABLE)
+                if "503" in erro_msg or "UNAVAILABLE" in erro_msg:
+                    print(f"⚠️ Modelo {modelo} indisponível (503). Tentativa {attempt}/{max_retries} aguardando {backoff_sec}s...")
+                    time.sleep(backoff_sec)
+                    backoff_sec *= 2.0
+                else:
+                    print(f"⚠️ Erro no modelo {modelo}: {e}. Alternando modelo...")
+                    break
+
+    print("⚠️ Todos os modelos de IA falharam/estão indisponíveis. Executando via motor de fallback local...")
     return fallback_local_adaptado(texto_mensagem, itens_existentes)
