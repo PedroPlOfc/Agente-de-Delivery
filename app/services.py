@@ -1,22 +1,18 @@
 import os
 import json
 import re
-import time
 import difflib
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+
+from app.schemas import ListaSeparacaoMercado
 
 load_dotenv()
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-# Modelo primário e secundários para cascata de resiliência
-MODELO_PRIMARIO = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-MODELOS_CASCATA = [MODELO_PRIMARIO, "gemini-2.0-flash", "gemini-1.5-flash"]
-
-client = genai.Client(api_key=API_KEY) if API_KEY else None
-
+# --- CATALOGO DE PRODUTOS PARA FALLBACK LOCAL ---
 CATALOGO_PRODUTOS = [
     "Arroz", "Feijão", "Feijão macassar", "Feijão preto", 
     "Macarrão", "Cuscuz", "Queijo", "Queijo coalho", "Presunto", "Leite", 
@@ -25,57 +21,83 @@ CATALOGO_PRODUTOS = [
 ]
 
 SYSTEM_INSTRUCTION = """
-Você é o Hermes, o assistente inteligente de delivery de um supermercado.
-Sua única função é gerenciar e atualizar a lista de compras (carrinho) do cliente a partir das mensagens enviadas.
-
-SUAS DIRETRIZES DE RACIOCÍNIO ADAPTÁVEL:
-
-1. MANIPULAÇÃO DO CARRINHO (ESTADO):
-   - Você receberá a lista de itens atuais do carrinho e a nova mensagem do cliente.
-   - ADICIONAR: Acrescente novos produtos mantendo os anteriores intactos na lista.
-   - SUBSTITUIR/EDITAR (POR ÍNDICE OU NOME): Se o cliente disser "mudar o item 1 para 3kg de arroz" ou "trocar o 2 por feijão preto", atualize diretamente aquele item no carrinho.
-   - REMOVER (POR ÍNDICE OU NOME): Se o cliente disser "remover o item 7", "tirar o 7" ou "apagar o guaraná", REMOVA o item correspondente da lista final. NUNCA crie produtos contendo palavras como "remover" ou "tirar".
-
-2. REGRAS DE MARCA PREFERIDA:
-   - Defina `marca_preferida` APENAS quando o cliente especificar uma marca para um produto genérico (Ex: produto: "Miojo galinha caipira", marca_preferida: "Vitarella").
-   - NUNCA repita o nome do produto na marca se o produto já for o próprio nome comercial/marca (Ex: produto: "Coca-Cola" -> marca_preferida: null; produto: "Nutella" -> marca_preferida: null).
-
-3. CORREÇÃO ORTOGRÁFICA E NORMALIZAÇÃO:
-   - Corrija automaticamente gírias, erros de digitação e termos incompletos (Ex: "feijo" -> "Feijão", "arros" -> "Arroz", "macarao" -> "Macarrão", "2k" -> 2kg).
-   - Limpe o nome do produto retirando saudações, quantidades, unidades e verbos ("gostaria de", "2kg de").
-   - Quantidades inteiras devem ser salvas como inteiros (Ex: 3 e não 3.0).
-
+...
 4. MENSAGEM DE RESPOSTA AO CLIENTE:
-   - Retorne uma mensagem amigável no campo `mensagem_resposta` contendo a lista resultante devidamente NUMERADA (1., 2., 3...).
+   - Retorne uma mensagem amigável no campo `mensagem_resposta`.
+   - A lista de itens DEVE obrigatoriamente ser formatada com quebras de linha (\\n) entre cada item numerado, para que apareça em tópicos verticais.
+   
+Exemplo do formato desejado em mensagem_resposta:
+Bom dia! Adicionei os seguintes itens ao seu carrinho:
 
-SAÍDA OBRIGATÓRIA (JSON PURO):
-{
-  "nome_cliente": null,
-  "endereco_entrega": null,
-  "itens": [
-    {
-      "produto": "Nome do Produto Corrigido",
-      "marca_preferida": null,
-      "quantidade": 1,
-      "unidade_medida": "un",
-      "categoria": "Mercearia",
-      "aceita_substituicao": true,
-      "observacao": ""
-    }
-  ],
-  "forma_pagamento": "A definir",
-  "duvida_ou_incompleto": false,
-  "mensagem_resposta": "Mensagem formatada para o WhatsApp"
-}
+1. Arroz (2 kg)
+2. Feijão (2 kg)
+3. Macarrão (2 pacotes)
+4. Queijo coalho (R$ 10,00)
+5. Coca-Cola (2 fardos)
+
+Deseja adicionar mais algum produto ou podemos prosseguir para a entrega?
+...
 """
 
-def limpar_resposta_json(texto: str) -> str:
-    """Remove marcações de código markdown caso o modelo retorne dentro de ```json ... ```."""
-    texto_limpo = texto.strip()
-    if texto_limpo.startswith("```"):
-        texto_limpo = re.sub(r'^```(?:json)?\s*', '', texto_limpo, flags=re.IGNORECASE)
-        texto_limpo = re.sub(r'\s*```$', '', texto_limpo)
-    return texto_limpo.strip()
+def inicializar_modelo_langchain():
+    """Configura o Gemini como principal e a OpenAI como 2ª opção (fallback)."""
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not gemini_key:
+        print("⚠️ GEMINI_API_KEY não encontrada. O sistema usará o motor local.")
+        return None
+
+    # 1ª Opção: Gemini 2.5 Flash
+    model_primary = ChatGoogleGenerativeAI(
+        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        google_api_key=gemini_key,
+        temperature=0.1,
+        max_retries=2
+    ).with_structured_output(ListaSeparacaoMercado)
+
+    fallbacks = []
+
+    # 2ª Opção (Fallback Primário): OpenAI GPT-4o-mini
+    if openai_key:
+        model_openai = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=openai_key,
+            temperature=0.1,
+            max_retries=2
+        ).with_structured_output(ListaSeparacaoMercado)
+        fallbacks.append(model_openai)
+
+    # 3ª Opção (Fallback Secundário): Gemini 1.5 Flash
+    model_gemini_15 = ChatGoogleGenerativeAI(
+        model="gemini-1.5-flash",
+        google_api_key=gemini_key,
+        temperature=0.1,
+        max_retries=2
+    ).with_structured_output(ListaSeparacaoMercado)
+    fallbacks.append(model_gemini_15)
+
+    return model_primary.with_fallbacks(fallbacks)
+
+
+# Inicializa a chain
+chain_llm = inicializar_modelo_langchain()
+
+prompt_template = ChatPromptTemplate.from_messages([
+    ("system", SYSTEM_INSTRUCTION),
+    ("user", """
+ESTADO ATUAL DO CARRINHO DO CLIENTE:
+{itens_existentes}
+
+MENSAGEM RECEBIDA DO CLIENTE:
+"{texto_mensagem}"
+
+Processe a intenção do cliente, atualize o carrinho e retorne o objeto final completo.
+""")
+])
+
+
+# --- FUNÇÕES AUXILIARES DE FALLBACK LOCAL ---
 
 def corrigir_produto_fuzzy(termo_digitado: str) -> str:
     termo_clean = termo_digitado.strip().capitalize()
@@ -86,7 +108,6 @@ def formatar_quantidade(valor: float):
     return int(valor) if valor.is_integer() else valor
 
 def extrair_itens_inteligente(texto: str, itens_existentes: list = None) -> list:
-    """Motor local resiliente (fallback)."""
     if itens_existentes is None:
         itens_existentes = []
 
@@ -176,7 +197,6 @@ def extrair_itens_inteligente(texto: str, itens_existentes: list = None) -> list
     return lista_resultado
 
 def fallback_local_adaptado(texto_mensagem: str, itens_existentes: list = None) -> str:
-    """Executa o processamento inteligente localmente quando a API Gemini falhar."""
     itens = extrair_itens_inteligente(texto_mensagem, itens_existentes)
     
     lista_formatada = "\n".join([
@@ -201,54 +221,42 @@ def fallback_local_adaptado(texto_mensagem: str, itens_existentes: list = None) 
     }
     return json.dumps(mock_data, ensure_ascii=False)
 
+
+# --- FUNÇÃO IMPORTADA PELO MAIN.PY ---
+
 def chamar_gemini(texto_mensagem: str, itens_existentes: list = None) -> str:
+    """Função invocada pela rota da FastAPI (main.py)."""
     if itens_existentes is None:
         itens_existentes = []
 
-    if not client:
+    if not chain_llm:
         return fallback_local_adaptado(texto_mensagem, itens_existentes)
 
-    config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION,
-        response_mime_type="application/json"
-    )
-    
-    prompt = f"""
-    ESTADO ATUAL DO CARRINHO DO CLIENTE:
-    {json.dumps(itens_existentes, ensure_ascii=False)}
+    try:
+        messages = prompt_template.format_messages(
+            itens_existentes=json.dumps(itens_existentes, ensure_ascii=False),
+            texto_mensagem=texto_mensagem
+        )
+        
+        resultado_pydantic: ListaSeparacaoMercado = chain_llm.invoke(messages)
+        
+        # --- REFORMATANDO A MENSAGEM DE RESPOSTA COM QUEBRAS DE LINHA (VERTICAL) ---
+        if resultado_pydantic.itens:
+            linhas_itens = []
+            for idx, item in enumerate(resultado_pydantic.itens, start=1):
+                unid = f" {item.unidade_medida}" if item.unidade_medida else ""
+                linhas_itens.append(f"{idx}. {item.produto} ({formatar_quantidade(item.quantidade)}{unid})")
+            
+            lista_vertical = "\n".join(linhas_itens)
+            
+            resultado_pydantic.mensagem_resposta = (
+                f"Bom dia! Aqui está a sua lista atualizada:\n\n"
+                f"{lista_vertical}\n\n"
+                f"Deseja adicionar mais algum produto ou podemos prosseguir para a entrega?"
+            )
 
-    MENSAGEM RECEBIDA DO CLIENTE:
-    "{texto_mensagem}"
+        return resultado_pydantic.model_dump_json(by_alias=True)
 
-    Processe a intenção do cliente, atualize o carrinho e retorne o JSON final completo.
-    """
-
-    # Tenta cascata de modelos com re-tentativas automáticas para erros 503/UNAVAILABLE
-    for modelo in MODELOS_CASCATA:
-        max_retries = 3
-        backoff_sec = 1.0
-
-        for attempt in range(1, max_retries + 1):
-            try:
-                response = client.models.generate_content(
-                    model=modelo,
-                    contents=prompt,
-                    config=config
-                )
-                if response.text:
-                    json_limpo = limpar_resposta_json(response.text)
-                    json.loads(json_limpo)
-                    return json_limpo
-            except Exception as e:
-                erro_msg = str(e)
-                # Trata erros temporários de sobrecarga (503 / UNAVAILABLE)
-                if "503" in erro_msg or "UNAVAILABLE" in erro_msg:
-                    print(f"⚠️ Modelo {modelo} indisponível (503). Tentativa {attempt}/{max_retries} aguardando {backoff_sec}s...")
-                    time.sleep(backoff_sec)
-                    backoff_sec *= 2.0
-                else:
-                    print(f"⚠️ Erro no modelo {modelo}: {e}. Alternando modelo...")
-                    break
-
-    print("⚠️ Todos os modelos de IA falharam/estão indisponíveis. Executando via motor de fallback local...")
-    return fallback_local_adaptado(texto_mensagem, itens_existentes)
+    except Exception as e:
+        print(f"⚠️ Erro ao processar via LangChain ({e}). Executando motor de fallback local...")
+        return fallback_local_adaptado(texto_mensagem, itens_existentes)
