@@ -20,6 +20,13 @@ CATALOGO_PRODUTOS = [
     "Carne", "Frango", "Refrigerante", "Cerveja"
 ]
 
+CATALOGO_PRODUTOS = [
+    "Arroz", "Feijão", "Feijão macassar", "Feijão preto", 
+    "Macarrão", "Cuscuz", "Queijo", "Queijo coalho", "Presunto", "Leite", 
+    "Coca-Cola", "Guaraná", "Miojo galinha caipira", "Detergente",
+    "Carne", "Frango", "Refrigerante", "Cerveja"
+]
+
 SYSTEM_INSTRUCTION = """
 Você é o Hermes, o assistente inteligente de delivery de um supermercado.
 Sua única função é gerenciar e atualizar a lista de compras (carrinho) do cliente a partir das mensagens enviadas.
@@ -227,6 +234,9 @@ def fallback_local_adaptado(texto_mensagem: str, itens_existentes: list = None) 
     }
     return json.dumps(mock_data, ensure_ascii=False)
 
+def chamar_gemini(texto_mensagem: str, itens_existentes: list = None) -> str:
+    if itens_existentes is None:
+        itens_existentes = []
 
 # --- CHAMADA PRINCIPAL COM REFORMATADO DE RESPOSTA ---
 

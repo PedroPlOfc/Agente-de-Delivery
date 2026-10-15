@@ -13,4 +13,4 @@ tests/__pycache__/
 .pytest_cache/
 
 # Configurações do Obsidian (apenas workspace e plugins locais)
-.obsidian/git
+.obsidian/

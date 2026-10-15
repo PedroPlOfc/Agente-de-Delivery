@@ -15,8 +15,10 @@ class ListaSeparacaoMercadoSchema(TypedDict):
     nome_cliente: Optional[str]
     endereco_entrega: Optional[str]
     itens: List[ItemMercadoSchema]
+    forma_pagamento: Optional[str]
     duvida_ou_incompleto: bool
     mensagem_resposta: str
+
 
 # --- MODELOS PYDANTIC PARA VALIDAÇÃO DAS REQUISIÇÕES/RESPOSTAS ---
 class ItemMercado(BaseModel):
@@ -32,6 +34,7 @@ class ListaSeparacaoMercado(BaseModel):
     nome_cliente: Optional[str] = None
     endereco_entrega: Optional[str] = None
     itens: List[ItemMercado] = Field(default_factory=list)
+    forma_pagamento: Optional[str] = "A definir"
     duvida_ou_incompleto: bool = False
     mensagem_resposta: str
 
