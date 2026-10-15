@@ -14,7 +14,6 @@ def enviar_mensagem_whatsapp(numero: str, texto: str) -> bool:
         "Content-Type": "application/json"
     }
     
-    # Mantém apenas os números (ex: +55 (81) 99999-9999 -> 5581999999999)
     numero_limpo = "".join(filter(str.isdigit, str(numero)))
 
     payload = {
