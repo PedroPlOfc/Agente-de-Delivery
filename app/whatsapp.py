@@ -1,42 +1,33 @@
+import logging
+
 import requests
-from app.config import EVOLUTION_API_URL, EVOLUTION_INSTANCE, EVOLUTION_API_KEY
+
+from app import config
+
+log = logging.getLogger("hermes.whatsapp")
+
 
 def enviar_mensagem_whatsapp(numero: str, texto: str) -> bool:
-    """Dispara a mensagem formatada de volta ao WhatsApp do cliente."""
-    if not EVOLUTION_API_KEY or not EVOLUTION_API_URL:
-        print("⚠️ Configurações da Evolution API não encontradas no .env. Envio ignorado.")
+    """Envia o texto ao cliente pela Evolution API (v1 ou v2, conforme EVOLUTION_API_VERSION)."""
+    if not config.EVOLUTION_API_KEY or not config.EVOLUTION_API_URL:
+        log.warning("Evolution API não configurada. Envio ignorado.")
         return False
 
-    url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
-    
-    headers = {
-        "apikey": EVOLUTION_API_KEY,
-        "Content-Type": "application/json"
-    }
-    
+    url = f"{config.EVOLUTION_API_URL}/message/sendText/{config.EVOLUTION_INSTANCE}"
+    headers = {"apikey": config.EVOLUTION_API_KEY, "Content-Type": "application/json"}
     numero_limpo = "".join(filter(str.isdigit, str(numero)))
 
-    payload = {
-        "number": numero_limpo,
-        "options": {
-            "delay": 1200, 
-            "presence": "composing"
-        },
-        "textMessage": {
-            "text": texto
-        }
-    }
+    if config.EVOLUTION_API_VERSION.startswith("1"):
+        payload = {"number": numero_limpo, "options": {"delay": 1200, "presence": "composing"},
+                   "textMessage": {"text": texto}}
+    else:
+        payload = {"number": numero_limpo, "text": texto, "delay": 1200}
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        
-        if response.status_code in [200, 201]:
-            print(f"✅ Mensagem enviada com sucesso para {numero_limpo}!")
+        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+        if resp.status_code in (200, 201):
             return True
-        else:
-            print(f"❌ Erro na Evolution API ({response.status_code}): {response.text}")
-            return False
-
-    except Exception as e:
-        print(f"⚠️ Erro de conexão ao enviar mensagem via WhatsApp: {e}")
-        return False
+        log.error("Evolution API respondeu %s: %s", resp.status_code, resp.text[:300])
+    except requests.RequestException as e:
+        log.error("Erro de conexão com a Evolution API: %s", e)
+    return False

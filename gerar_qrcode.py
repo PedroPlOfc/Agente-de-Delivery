@@ -1,9 +1,10 @@
 import httpx
 import webbrowser
 import os
+from dotenv import load_dotenv
 
 BASE_URL = "https://evolution-api-delivery.onrender.com"
-API_KEY = "d8k1m6v1n2845j1z98c1f4b9x1h3b9a"
+API_KEY = "EVOLUTION_API_KEY"
 INSTANCE_NAME = "mercado_central"
 
 headers = {
