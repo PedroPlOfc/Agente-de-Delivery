@@ -2,10 +2,9 @@
 import json
 import logging
 from typing import Dict, List
-
 from app.config import REDIS_URL
 
-log = logging.getLogger("hermes.estado")
+log = logging.getLogger("cana.estado")
 TTL_SEGUNDOS = 60 * 60 * 24  # carrinho expira em 24h
 
 _memoria: Dict[str, List[dict]] = {}
@@ -23,7 +22,7 @@ if REDIS_URL:
 
 
 def _chave(telefone: str) -> str:
-    return "hermes:carrinho:" + "".join(c for c in telefone if c.isdigit())
+    return "cana:carrinho:" + "".join(c for c in telefone if c.isdigit())
 
 
 def carregar_carrinho(telefone: str) -> List[dict]:

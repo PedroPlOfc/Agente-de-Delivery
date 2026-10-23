@@ -4,7 +4,7 @@ import requests
 
 from app import config
 
-log = logging.getLogger("hermes.whatsapp")
+log = logging.getLogger("cana.whatsapp")
 
 
 def enviar_mensagem_whatsapp(numero: str, texto: str) -> bool:

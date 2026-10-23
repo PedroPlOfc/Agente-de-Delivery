@@ -1,13 +1,10 @@
 import os
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
 def _lista(valor: str) -> list[str]:
     return [v.strip() for v in valor.split(",") if v.strip()]
-
 
 # IA (a ausência da chave NÃO derruba a aplicação: usa-se o motor local)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

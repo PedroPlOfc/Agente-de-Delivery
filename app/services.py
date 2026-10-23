@@ -8,9 +8,13 @@ from functools import lru_cache
 from typing import List, Optional
 
 from app import config
+from app.repositories.factory import get_product_repository
 from app.schemas import ListaSeparacaoMercado
 
-log = logging.getLogger("hermes.services")
+log = logging.getLogger("cana.services")
+
+# Instancia o repositório configurado no .env (PostgresMockRepository ou SysPDVApiRepository)
+repo = get_product_repository()
 
 # --------------------------------------------------------------------------
 # Catálogo e dicionários (usados pelo motor local e para normalizar a saída da IA)
@@ -49,11 +53,11 @@ _NUM_RE = r"\d+(?:[.,]\d+)?"
 _VERBOS_REMOCAO = r"(?:remover|tirar|deletar|excluir|cancelar|apagar)"
 
 SYSTEM_INSTRUCTION = """
-Você é o Hermes, o assistente inteligente de delivery de um supermercado.
-Sua única função é gerenciar e atualizar a lista de compras (carrinho) do cliente a partir das mensagens enviadas.
+Você é o Cana, o assistente inteligente e ecologicamente consciente do Sacolão da Economia.
+Sua única função é gerenciar e atualizar a lista de compras (sacola) do cliente a partir das mensagens enviadas.
 
-1. MANIPULAÇÃO DO CARRINHO (ESTADO):
-   - Você receberá a lista de itens atuais do carrinho e a nova mensagem do cliente.
+1. MANIPULAÇÃO DA SACOLA (ESTADO):
+   - Você receberá a lista de itens atuais da sacola e a nova mensagem do cliente.
    - ADICIONAR: acrescente novos produtos mantendo os anteriores intactos.
    - SUBSTITUIR/EDITAR (por índice ou nome): "mudar o item 1 para 3kg de arroz" atualiza aquele item.
    - REMOVER (por índice ou nome): "remover o item 7" ou "apagar o guaraná" remove o item da lista final.
@@ -64,17 +68,16 @@ Sua única função é gerenciar e atualizar a lista de compras (carrinho) do cl
    - Preencha `marca_preferida` APENAS quando o cliente citar uma marca para um produto genérico.
    - Não repita o produto como marca (Coca-Cola -> marca_preferida: null).
 
-3. NORMALIZAÇÃO:
+3. CULTURA ECO-FRIENDLY & SUSTENTABILIDADE:
+   - Sempre reforce com amabilidade que as entregas do Sacolão da Economia utilizam sacolas retornáveis para proteger o meio ambiente.
+
+4. NORMALIZAÇÃO & DÚVIDAS:
    - Corrija erros de digitação ("feijo" -> "Feijão", "2k" -> 2kg).
    - Limpe o nome do produto (sem saudações, quantidades ou verbos).
    - Preserve especificações: "carne moída" continua "Carne moída".
    - Use categoria de departamento: Açougue, Laticínios, Hortifruti, Bebidas, Limpeza, Padaria, Mercearia ou Outros.
-   - Unidades: kg, g, l, un, pct, cx, fardo ou reais (quando o cliente fala em valor, ex.: "10 reais de queijo").
-
-4. DÚVIDAS:
-   - Se faltar informação essencial ou o pedido for ambíguo, marque `duvida_ou_incompleto` como true
-     e escreva em `mensagem_resposta` a pergunta de esclarecimento ao cliente.
-   - Caso contrário, `mensagem_resposta` pode ser uma frase curta e amigável.
+   - Unidades: kg, g, l, un, pct, cx, fardo ou reais.
+   - Se faltar informação essencial ou o pedido for ambíguo, marque `duvida_ou_incompleto` como true e escreva em `mensagem_resposta` a pergunta de esclarecimento ao cliente.
 """
 
 PROMPT_USUARIO = """ESTADO ATUAL DO CARRINHO DO CLIENTE:
@@ -96,14 +99,29 @@ def _sem_acento(texto: str) -> str:
 _CATALOGO_NORM = {_sem_acento(p): p for p in CATALOGO_PRODUTOS}
 
 
-def corrigir_produto_fuzzy(termo: str) -> str:
-    """Corrige erros de digitação apenas quando a confiança é alta.
+def consultar_produto_banco(termo: str) -> Optional[dict]:
+    """Consulta o banco de dados (PostgreSQL/SysPDV) via Repository Pattern."""
+    try:
+        resultados = repo.buscar_por_nome(termo)
+        if resultados:
+            return resultados[0]
+    except Exception as e:
+        log.warning("Falha ao consultar banco de dados (%s).", e)
+    return None
 
-    Nomes compostos fora do catálogo (ex.: "Carne moída") são preservados.
-    """
+
+def corrigir_produto_fuzzy(termo: str) -> str:
+    """Corrige erros de digitação buscando primeiro no banco de dados e depois no catálogo local."""
     termo_limpo = termo.strip()
     if not termo_limpo:
         return termo_limpo
+
+    # 1. Tenta buscar no banco de dados
+    prod_banco = consultar_produto_banco(termo_limpo)
+    if prod_banco:
+        return prod_banco["nome"]
+
+    # 2. Fallback no catálogo local
     norm = _sem_acento(termo_limpo)
     if norm in ALIASES:
         return ALIASES[norm]
@@ -123,6 +141,11 @@ def formatar_quantidade(valor: float):
 
 
 def inferir_categoria(produto: str) -> str:
+    # Tenta buscar a categoria oficial direto no banco de dados
+    prod_banco = consultar_produto_banco(produto)
+    if prod_banco and prod_banco.get("categoria"):
+        return prod_banco["categoria"]
+
     p = _sem_acento(produto)
     for categoria, palavras in CATEGORIAS.items():
         if any(_sem_acento(w) in p for w in palavras):
@@ -154,10 +177,11 @@ def _saudacao() -> str:
 
 def montar_mensagem(itens: List[dict]) -> str:
     if not itens:
-        return "Sua lista de compras está vazia no momento. O que gostaria de adicionar?"
+        return "Sua sacola de compras está vazia no momento. O que gostaria de adicionar do Sacolão da Economia?"
     linhas = "\n".join(f"{i}. {_texto_item(it)}" for i, it in enumerate(itens, start=1))
     return (
-        f"{_saudacao()}! Aqui está a sua lista atualizada:\n\n{linhas}\n\n"
+        f"{_saudacao()}! Sou o Cana 🌿. Aqui está a sua sacola atualizada:\n\n{linhas}\n\n"
+        "🌱 Lembramos que sua entrega será feita em sacolas retornáveis!\n"
         "Deseja adicionar mais algum produto ou podemos prosseguir para a entrega? "
         "Se já estiver tudo certo, me diga a forma de pagamento."
     )
