@@ -1,5 +1,4 @@
-### 📍 Dia 1: Estruturação Inicial e Backend Base
-
+## 📍 Dia 1: Estruturação Inicial e Backend Base
 - **Criação do Ponto de Entrada (`main.py`)**: Configuração do servidor web assíncrono com **FastAPI** e servidor **Uvicorn** rodando na porta `8000`.
     
 - **Modelagem de Dados (`app/schemas.py`)**:
@@ -14,9 +13,7 @@
         
     - Mapeamento das categorias permitidas: _Açougue, Laticínios e Frios, Hortifruti, Mercearia, Bebidas, Limpeza e Higiene, Outros_.
         
-
-### 📍 Dia 2: Resiliência, Tratamento de Erros e Fallback Engine
-
+## 📍 Dia 2: Resiliência, Tratamento de Erros e Fallback Engine
 - **Tratamento de Limites da API do Gemini (Erros 503 e 429)**:
     
     - Implementação do pacote `tenacity` com estratégia de retentativas e tempo de espera exponencial (`wait_exponential`).
@@ -47,9 +44,7 @@
             
         - `reais` / `real` $\rightarrow$ `reais`
             
-
-### 📍 Dia 3: Frontend, Comunicação CORS e Refinamento do Painel
-
+## 📍 Dia 3: Frontend, Comunicação CORS e Refinamento do Painel
 - **Desenvolvimento da Interface (`templates/index.html`)**:
     
     - Construção do painel de testes interativo utilizando **Tailwind CSS**.
@@ -68,9 +63,7 @@
         
     - Formatação visual especial para valores monetários (`R$ 10.00`) e quantidades por peso/embalagem.
         
-
-### 📍 Dia 4: Finalização, Documentação e Organização do Git
-
+## 📍 Dia 4: Finalização, Documentação e Organização do Git
 - **Ajustes no Repositório e Ficheiros de Configuração**:
     
     - Atualização do `requirements.txt` com todas as dependências do ambiente virtual (`google-genai`, `fastapi`, `uvicorn`, `pydantic`, `tenacity`, `python-dotenv`).
@@ -82,3 +75,37 @@
     - Mapeamento detalhado da arquitetura e responsabilidade de cada ficheiro do projeto.
         
     - Passo a passo completo de instalação e execução para apresentação pública e avaliação.
+## 📍 Dia 5: Estruturação Inicial e Backend Base
+- Configuração do servidor **FastAPI** e servidor Uvicorn rodando na porta `8000`.
+    
+- Criação dos contratos Pydantic (`ItemMercado`, `ListaSeparacaoMercado`) em `app/schemas.py`.
+    
+- Integração inicial com a API do Gemini e definição das regras de separação.
+## 📍 Dia 6: Resiliência, Fallback Engine e Interface Inicial
+- Criação da engine de fallback via Regex (`extrair_itens_inteligente()`) para zero downtime.
+    
+- Suporte a unidades dinâmicas (`kg`, `pct`, `cx`, `reais`, `un`).
+    
+- Construção da primeira versão do dashboard de testes no frontend (`templates/index.html`).
+## 📍 Dia 7: Rebranding para "Cana" e Transição de Marca
+- Transição da persona do bot de "Hermes" para **Cana (Sacolão da Economia)**.
+    
+- Redesign do frontend com paleta verde sustentável (`emerald`), novo mascote e mensagens focadas no uso de sacolas retornáveis e consumo consciente.
+    
+- Atualização do prompt do sistema em `app/services.py`.
+## 📍 Dia 8: Arquitetura com Repository Pattern e PostgreSQL
+- Criação do banco de dados relacional local no PostgreSQL 15 via Docker (`docker-compose.yml` e `init_db.sql`).
+    
+- Modelagem das tabelas relativas a produtos, categorias e saldos em estoque.
+    
+- Implementação do **Repository Pattern** (`app/repositories/`):
+    
+    - Interface abstrata `AbstractProductRepository`.
+        
+    - Implementação `PostgresMockRepository` com integração `psycopg2-binary`.
+        
+    - Stub `SysPDVApiRepository` preparado para integração futura com o ERP comercial.
+        
+    - Fábrica de injeção de dependência em `factory.py`.
+        
+- Conexão entre a camada de extração de IA em `app/services.py` e as consultas do repositório relacional.

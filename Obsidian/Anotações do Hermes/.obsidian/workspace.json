@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Relatórios/🛠️ Resumo da Arquitetura do Sistema.md",
+                "file": "Relatórios/📄 Relatório de Desenvolvimento — Projeto Hermes.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "🛠️ Resumo da Arquitetura do Sistema"
+              "title": "📄 Relatório de Desenvolvimento — Projeto Hermes"
             }
           }
         ]
@@ -206,12 +206,12 @@
   },
   "active": "1caa39d49f7a2677",
   "lastOpenFiles": [
-    "Relatórios/🗓️ Cronograma de Desenvolvimento.md",
     "Relatórios/🛠️ Resumo da Arquitetura do Sistema.md",
-    "Relatórios/📄 Relatório de Desenvolvimento — Projeto Hermes.md",
+    "Relatórios/🗓️ Cronograma de Desenvolvimento.md",
+    "Estrutura de Dados/🏗️Estrutura do Código.md",
     "Estrutura de Dados/🚀 Como Executar o Projeto Hermes.md",
+    "Relatórios/📄 Relatório de Desenvolvimento — Projeto Hermes.md",
     "Relatórios",
-    "Estrutura de Dados/Estrutura do Código.md",
     "Estrutura de Dados"
   ]
 }

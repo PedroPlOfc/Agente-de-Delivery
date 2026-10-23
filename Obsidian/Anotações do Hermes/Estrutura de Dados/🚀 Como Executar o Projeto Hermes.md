@@ -44,7 +44,9 @@ Com o ambiente virtual ativado, instale as bibliotecas listadas no `requirements
 Bash
 
 ```
-pip install -r requirements.txt
+pip install -r requirements.txt 
+# Ou se estiver usando o gerenciador uv:
+uv pip install -r requirements.txt
 ```
 
 ### Passo 4: Configurar a Chave da API (`.env`)
@@ -54,17 +56,32 @@ Crie um arquivo chamado `.env` na raiz do projeto e adicione a sua chave do Gemi
 Snippet de código
 
 ```
-GEMINI_API_KEY=sua_chave_api_aqui
+# --- IA --- GEMINI_API_KEY=sua_chave_gemini_aqui GEMINI_MODEL=gemini-3.8-flash GEMINI_FALLBACK_MODEL=gemini-1.5-flash
+# --- Evolution API (WhatsApp) --- EVOLUTION_API_URL=http://localhost:8080 EVOLUTION_INSTANCE=sacolao_cana EVOLUTION_API_KEY=sua_chave_evolution_aqui 
+# --- Repositório & Banco de Dados (PostgreSQL Local) --- DATA_SOURCE_PROVIDER=POSTGRES_MOCK POSTGRES_PASSWORD=sua_senha_postgres_aqui DATABASE_URL=postgresql://evolution:sua_senha_postgres_aqui@localhost:5432/evolution 
+# --- Futura Integração SysPDV --- SYSPDV_API_URL= SYSPDV_TOKEN=
+```
+### Passo 5: Inicializar o Banco de Dados PostgreSQL (Docker)
+
+1. Certifique-se de que o **Docker Desktop** está rodando.
+    
+2. Suba o container do PostgreSQL: 
+```
+docker compose up -d postgres
+```
+3. Execute o script de inicialização `init_db.sql` para criar as tabelas e popular os dados de teste do **Sacolão da Economia**:
+
+- Powershell
+```
+Get-Content init_db.sql | docker exec -i evolution_postgres psql -U evolution -d evolution
 ```
 
-O .env também possui uma segunda chave, usada para quando o bot for ser testado em um whatsapp usando a Evolution API.
-
+- Git Bash / Linux / macOS
 ```
-EVOLUTION_API_KEY=sua_chave_api_aqui
+Iniciar o Servidor Backend (FastAPI)
 ```
-### Passo 5: Iniciar o Servidor Backend (FastAPI)
 
-Execute o arquivo principal para subir o servidor local na porta `8000`:
+### Passo 6: Iniciar o Servidor Backend (FastAPI): Execute o arquivo principal para subir o servidor local na porta `8000`:
 
 Bash
 
@@ -74,16 +91,6 @@ python main.py
 
 > O terminal exibirá mensagens de inicialização do `uvicorn` indicando que o servidor está rodando em `[http://0.0.0.0:8000](http://0.0.0.0:8000)`.
 
-### Passo 6: Acessar o Painel de Testes
+### Passo 7: Acessar a Interface do Cana
 
-Você pode abrir o painel de duas formas:
-
-1. **Pelo próprio FastAPI (Recomendado):** Acesse no navegador:
-    
-    Plaintext
-    
-    ```
-    http://127.0.0.1:8000
-    ```
-    
-2. **Via Live Server (VS Code):** Abra o arquivo `templates/index.html` e clique em **Go Live** no VS Code. O painel se conectará automaticamente à porta `8000` do backend!
+Abra o navegador em `http://127.0.0.1:8000` para interagir com o **Cana**, simular o atendimento do Sacolão da Economia e testar a extração de itens e consulta de estoque em tempo real.

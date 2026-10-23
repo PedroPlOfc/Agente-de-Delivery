@@ -1,5 +1,3 @@
-> **Projeto:** Agente de IA para Delivery & Automação de Supermercados
-> 
-> **Arquitetura:** FastAPI + Google Gemini API (`google-genai`) + Frontend Tailwind CSS
-> 
-> **Objetivo:** Processamento e categorização automática de pedidos de clientes via texto/áudio com saída em JSON estruturado para equipas de separação.
+> **Projeto:** Agente de IA para Delivery — Sacolão da Economia (Mascote Cana 🌿)
+> **Arquitetura:** FastAPI + LangChain / Google Gemini API + PostgreSQL 15 (Docker) + Repository Pattern + Frontend Tailwind CSS
+> **Objetivo:** Processamento e categorização automática de pedidos de hortifruti e mercearia via WhatsApp, com consulta de estoque em tempo real e incentivo ao uso de sacolas retornáveis eco-friendly.
