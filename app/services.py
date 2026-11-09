@@ -181,7 +181,6 @@ def montar_mensagem(itens: List[dict]) -> str:
     linhas = "\n".join(f"{i}. {_texto_item(it)}" for i, it in enumerate(itens, start=1))
     return (
         f"{_saudacao()}! Sou o Cana 🌿. Aqui está a sua sacola atualizada:\n\n{linhas}\n\n"
-        "🌱 Lembramos que sua entrega será feita em sacolas retornáveis!\n"
         "Deseja adicionar mais algum produto ou podemos prosseguir para a entrega? "
         "Se já estiver tudo certo, me diga a forma de pagamento."
     )
