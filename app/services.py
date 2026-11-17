@@ -293,8 +293,11 @@ def obter_chain():
 
         def gemini(nome: str, temp: float):
             return ChatGoogleGenerativeAI(
-                model=nome, google_api_key=config.GEMINI_API_KEY,
-                temperature=temp, max_retries=1, timeout=25,
+                model=nome, 
+                google_api_key=config.GEMINI_API_KEY,
+                temperature=temp, 
+                max_retries=1, 
+                timeout=45,
             ).with_structured_output(ListaSeparacaoMercado)
 
         primario = gemini(config.GEMINI_MODEL, 0.0)

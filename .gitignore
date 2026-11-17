@@ -14,3 +14,5 @@ tests/__pycache__/
 
 # Configurações do Obsidian (apenas workspace e plugins locais)
 .obsidian/
+
+.env

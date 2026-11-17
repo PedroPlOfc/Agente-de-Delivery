@@ -6,7 +6,7 @@
     environment:
       POSTGRES_DB: evolution
       POSTGRES_USER: evolution
-      POSTGRES_PASSWORD: evolution_password
+      POSTGRES_PASSWORD: my_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -49,7 +49,7 @@
       
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: "postgresql"
-      DATABASE_CONNECTION_URI: "postgresql://evolution:evolution_password@postgres:5432/evolution?schema=public"
+      DATABASE_CONNECTION_URI: "postgresql://evolution:my_password@postgres:5432/evolution?schema=public"
       DATABASE_CONNECTION_CLIENT_NAME: "evolution_db"
       DATABASE_SAVE_DATA_INSTANCE_DB: "true"
       
