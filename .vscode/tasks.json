@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CANA: iniciar todos os serviços (Docker)",
+      "type": "shell",
+      "command": "docker compose up --build -d",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "CANA: acompanhar logs Python e Java",
+      "type": "shell",
+      "command": "docker compose logs -f python-api java-api",
+      "problemMatcher": []
+    },
+    {
+      "label": "CANA: parar serviços (preservar dados)",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "CANA: executar testes Python",
+      "type": "shell",
+      "command": "pytest -q",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

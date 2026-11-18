@@ -1,18 +1,39 @@
-# Ambientes Virtuais
-venv/
-.venv/
-
-# Configuração e Chaves Sensíveis (NUNCA envie para o GitHub)
+# Segredos e configuração local
 .env
+.env.*
+!.env.example
 
-# Cache do Python e Testes
+# Python
+.venv/
+venv/
 __pycache__/
 *.py[cod]
-app/__pycache__/
-tests/__pycache__/
 .pytest_cache/
+.coverage
+htmlcov/
 
-# Configurações do Obsidian (apenas workspace e plugins locais)
-.obsidian/
+# Java / Maven
+target/
+backend-java/target/
+*.class
+
+# IDE / sistema operacional
+.vscode/*.log
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Dados locais
+*.sqlite3
+
+# QR Codes gerados em tempo de execução (contêm dados de pareamento)
+qrcode.html
+qrcode_view.html
 
 .env
+.venv/
+venv/
+__pycache__/
+*.pyc
+Obsidian/
