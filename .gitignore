@@ -30,10 +30,3 @@ Thumbs.db
 # QR Codes gerados em tempo de execução (contêm dados de pareamento)
 qrcode.html
 qrcode_view.html
-
-.env
-.venv/
-venv/
-__pycache__/
-*.pyc
-Obsidian/
