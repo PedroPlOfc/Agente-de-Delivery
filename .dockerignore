@@ -1,0 +1,22 @@
+# Arquivos locais e segredos nunca entram no contexto Docker
+.git
+.env
+.env.*
+!.env.example
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+Obsidian
+docs
+tests
+backend-java
+*.zip
+*.pdf
+.idea
+.vscode
+qrcode.html
+qrcode_view.html

@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app import config
+from app.java_api import JavaApiError, admin_call, admin_login, verificar_saude
 from app.estado import carregar_carrinho, salvar_carrinho
 from app.schemas import MensagemEntrada
 from app.services import chamar_gemini
@@ -18,13 +19,13 @@ from app.whatsapp import enviar_mensagem_whatsapp
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("cana")
 
-app = FastAPI(title="Sacolão da Economia — Assistente Cana 🌿")
+app = FastAPI(title="CANA — Assistente de Delivery 🌿", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH"],
     allow_headers=["Content-Type", "Accept"],
 )
 
@@ -48,18 +49,104 @@ _vistos: deque = deque(maxlen=500)
 async def home(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_home(request: Request):
+    """Painel administrativo; toda persistência continua no serviço Java."""
+    return templates.TemplateResponse(request, "admin.html")
+
+
+def _admin_token(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    if not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        raise HTTPException(status_code=401, detail="Faça login no CANA Admin.")
+    return authorization[7:].strip()
+
+
+def _admin_proxy(method: str, path: str, request: Request, *, params=None, payload=None):
+    try:
+        return admin_call(method, path, _admin_token(request), params=params, payload=payload)
+    except JavaApiError as exc:
+        message = str(exc)
+        status = 401 if "HTTP 401" in message else (403 if "HTTP 403" in message else (400 if "HTTP 400" in message else 502))
+        raise HTTPException(status_code=status, detail=message) from exc
+
+
+@app.post("/admin/api/login")
+async def admin_login_proxy(payload: dict, request: Request):
+    _checar_rate_limit(request.client.host if request.client else "desconhecido")
+    try:
+        return admin_login(str(payload.get("username", "")), str(payload.get("password", "")))
+    except JavaApiError as exc:
+        message = str(exc)
+        status = 401 if "HTTP 401" in message else 502
+        raise HTTPException(status_code=status, detail=message) from exc
+
+
+@app.get("/admin/api/dashboard")
+def admin_dashboard(request: Request):
+    return _admin_proxy("GET", "/api/admin/dashboard", request)
+
+
+@app.get("/admin/api/products")
+def admin_products(request: Request, query: str = ""):
+    return _admin_proxy("GET", "/api/admin/products", request, params={"query": query})
+
+
+@app.post("/admin/api/products")
+def admin_create_product(payload: dict, request: Request):
+    return _admin_proxy("POST", "/api/admin/products", request, payload=payload)
+
+
+@app.put("/admin/api/products/{product_id}")
+def admin_update_product(product_id: int, payload: dict, request: Request):
+    return _admin_proxy("PUT", f"/api/admin/products/{product_id}", request, payload=payload)
+
+
+@app.post("/admin/api/products/{product_id}/stock-movements")
+def admin_stock_movement(product_id: int, payload: dict, request: Request):
+    return _admin_proxy("POST", f"/api/admin/products/{product_id}/stock-movements", request, payload=payload)
+
+
+@app.get("/admin/api/stock-movements")
+def admin_stock_history(request: Request):
+    return _admin_proxy("GET", "/api/admin/stock-movements", request)
+
+
+@app.get("/admin/api/orders")
+def admin_orders(request: Request):
+    return _admin_proxy("GET", "/api/admin/orders", request)
+
+
+@app.patch("/admin/api/orders/{order_id}/status")
+def admin_update_order_status(order_id: int, payload: dict, request: Request):
+    return _admin_proxy("PATCH", f"/api/admin/orders/{order_id}/status", request, payload=payload)
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    """Liveness do serviço Python (não depende do backend Java)."""
+    return {"status": "ok", "service": "cana-python"}
+
+
+@app.get("/ready")
+def ready():
+    """Readiness: confirma que o serviço Java está acessível."""
+    if not verificar_saude():
+        raise HTTPException(status_code=503, detail="Backend Java indisponível.")
+    return {"status": "ready", "python": "ok", "java": "ok"}
 
 @app.post("/webhook/mercado")
 def webhook_mercado(payload: MensagemEntrada, request: Request):
     _checar_rate_limit(request.client.host if request.client else "desconhecido")
 
-    itens = payload.itens_atuais if payload.itens_atuais is not None else carregar_carrinho(payload.telefone)
-    lista = chamar_gemini(payload.mensagem, itens)
-    salvar_carrinho(payload.telefone, lista["itens"])
-    return {"status": "success", "cliente": payload.telefone, "lista_separacao": lista}
+    try:
+        itens = payload.itens_atuais if payload.itens_atuais is not None else carregar_carrinho(payload.telefone)
+        lista = chamar_gemini(payload.mensagem, itens)
+        salvar_carrinho(payload.telefone, lista["itens"])
+        return {"status": "success", "cliente": payload.telefone, "lista_separacao": lista}
+    except JavaApiError as exc:
+        log.error("Backend Java indisponível durante processamento: %s", exc)
+        raise HTTPException(status_code=503, detail="O serviço de dados está temporariamente indisponível.") from exc
 
 def _extrair_texto(message: dict) -> str:
     if not isinstance(message, dict):

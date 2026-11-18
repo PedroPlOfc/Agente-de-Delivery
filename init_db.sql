@@ -1,40 +1,30 @@
--- Remove tabelas antigas se existirem
-DROP TABLE IF EXISTS itens_pedido CASCADE;
-DROP TABLE IF EXISTS pedidos CASCADE;
-DROP TABLE IF EXISTS estoque CASCADE;
-DROP TABLE IF EXISTS produtos CASCADE;
-DROP TABLE IF EXISTS categorias CASCADE;
-
--- 1. Categorias
-CREATE TABLE categorias (
+-- Migração não destrutiva: cria apenas objetos ausentes e preserva dados existentes.
+CREATE TABLE IF NOT EXISTS categorias (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL UNIQUE,
     descricao TEXT,
-    criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Produtos
-CREATE TABLE produtos (
+CREATE TABLE IF NOT EXISTS produtos (
     id SERIAL PRIMARY KEY,
     codigo_barras VARCHAR(20) UNIQUE NOT NULL,
     nome VARCHAR(150) NOT NULL,
-    categoria_id INT NOT NULL REFERENCES categorias(id) ON DELETE RESTRICT,
+    categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE RESTRICT,
     preco_venda NUMERIC(10, 2) NOT NULL CHECK (preco_venda >= 0),
     unidade_medida VARCHAR(10) NOT NULL DEFAULT 'UN',
     ativo BOOLEAN NOT NULL DEFAULT TRUE,
-    criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Estoque
-CREATE TABLE estoque (
+CREATE TABLE IF NOT EXISTS estoque (
     id SERIAL PRIMARY KEY,
-    produto_id INT NOT NULL UNIQUE REFERENCES produtos(id) ON DELETE CASCADE,
+    produto_id INTEGER NOT NULL UNIQUE REFERENCES produtos(id) ON DELETE CASCADE,
     quantidade_disponivel NUMERIC(10, 3) NOT NULL DEFAULT 0.000,
-    atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Pedidos
-CREATE TABLE pedidos (
+CREATE TABLE IF NOT EXISTS pedidos (
     id SERIAL PRIMARY KEY,
     cliente_telefone VARCHAR(20) NOT NULL,
     cliente_nome VARCHAR(100),
@@ -42,32 +32,60 @@ CREATE TABLE pedidos (
     forma_pagamento VARCHAR(50),
     valor_total NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     origem VARCHAR(20) NOT NULL DEFAULT 'WHATSAPP',
-    criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. Itens do Pedido
-CREATE TABLE itens_pedido (
+CREATE TABLE IF NOT EXISTS itens_pedido (
     id SERIAL PRIMARY KEY,
-    pedido_id INT NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
-    produto_id INT NOT NULL REFERENCES produtos(id) ON DELETE RESTRICT,
+    pedido_id INTEGER NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+    produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE RESTRICT,
     quantidade NUMERIC(10, 3) NOT NULL CHECK (quantidade > 0),
     preco_unitario NUMERIC(10, 2) NOT NULL,
     subtotal NUMERIC(10, 2) NOT NULL
 );
 
--- Carga inicial de dados de teste (Sacolão da Economia)
-INSERT INTO categorias (id, nome, descricao) VALUES
-(1, 'Hortifruti', 'Frutas e legumes'),
-(2, 'Mercearia', 'Grãos e cereais'),
-(3, 'Açougue', 'Carnes e aves'),
-(4, 'Laticínios', 'Queijos e leites');
+-- Persistência definitiva dos carrinhos sob responsabilidade do serviço Java.
+CREATE TABLE IF NOT EXISTS carrinhos (
+    telefone VARCHAR(40) PRIMARY KEY,
+    itens_json TEXT NOT NULL DEFAULT '[]',
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-INSERT INTO produtos (id, codigo_barras, nome, categoria_id, preco_venda, unidade_medida) VALUES
-(1, '7891000100011', 'Banana Prata', 1, 5.99, 'KG'),
-(2, '7891000100028', 'Maçã Fuji', 1, 8.49, 'KG'),
-(3, '7891000200018', 'Arroz Tio João 1kg', 2, 6.50, 'UN'),
-(4, '7891000200025', 'Feijão Carioca 1kg', 2, 7.90, 'UN'),
-(5, '7891000400029', 'Queijo Coalho Betânia', 4, 42.00, 'KG');
+CREATE INDEX IF NOT EXISTS idx_produtos_nome_lower ON produtos (LOWER(nome));
+CREATE INDEX IF NOT EXISTS idx_pedidos_cliente_telefone ON pedidos (cliente_telefone);
 
-INSERT INTO estoque (produto_id, quantidade_disponivel) VALUES
-(1, 150.000), (2, 80.000), (3, 500.000), (4, 350.000), (5, 25.000);
+INSERT INTO categorias (nome, descricao) VALUES
+    ('Hortifruti', 'Frutas e legumes'),
+    ('Mercearia', 'Grãos e cereais'),
+    ('Açougue', 'Carnes e aves'),
+    ('Laticínios', 'Queijos e leites')
+ON CONFLICT (nome) DO NOTHING;
+
+INSERT INTO produtos (codigo_barras, nome, categoria_id, preco_venda, unidade_medida)
+SELECT seed.codigo_barras, seed.nome, c.id, seed.preco_venda, seed.unidade_medida
+FROM (VALUES
+    ('7891000100011', 'Banana Prata', 'Hortifruti', 5.99::NUMERIC, 'KG'),
+    ('7891000100028', 'Maçã Fuji', 'Hortifruti', 8.49::NUMERIC, 'KG'),
+    ('7891000200018', 'Arroz Tio João 1kg', 'Mercearia', 6.50::NUMERIC, 'UN'),
+    ('7891000200025', 'Feijão Carioca 1kg', 'Mercearia', 7.90::NUMERIC, 'UN'),
+    ('7891000400029', 'Queijo Coalho Betânia', 'Laticínios', 42.00::NUMERIC, 'KG')
+) AS seed(codigo_barras, nome, categoria_nome, preco_venda, unidade_medida)
+JOIN categorias c ON c.nome = seed.categoria_nome
+ON CONFLICT (codigo_barras) DO NOTHING;
+
+INSERT INTO estoque (produto_id, quantidade_disponivel)
+SELECT p.id, seed.quantidade
+FROM (VALUES
+    ('7891000100011', 150.000::NUMERIC),
+    ('7891000100028', 80.000::NUMERIC),
+    ('7891000200018', 500.000::NUMERIC),
+    ('7891000200025', 350.000::NUMERIC),
+    ('7891000400029', 25.000::NUMERIC)
+) AS seed(codigo_barras, quantidade)
+JOIN produtos p ON p.codigo_barras = seed.codigo_barras
+ON CONFLICT (produto_id) DO NOTHING;
+
+-- Ajusta sequências quando o banco recebeu IDs explícitos na carga inicial.
+SELECT setval(pg_get_serial_sequence('categorias', 'id'), COALESCE((SELECT MAX(id) FROM categorias), 1), true);
+SELECT setval(pg_get_serial_sequence('produtos', 'id'), COALESCE((SELECT MAX(id) FROM produtos), 1), true);
+SELECT setval(pg_get_serial_sequence('estoque', 'id'), COALESCE((SELECT MAX(id) FROM estoque), 1), true);

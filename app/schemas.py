@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 class ItemMercado(BaseModel):
     produto: str
+    produto_id: Optional[int] = None
     marca_preferida: Optional[str] = None
     quantidade: float = 1.0
     unidade_medida: str = "un"

@@ -8,14 +8,12 @@ from functools import lru_cache
 from typing import List, Optional
 
 from app import config
-from app.repositories.factory import get_product_repository
+from app.java_api import buscar_produtos
 from app.schemas import ListaSeparacaoMercado
 
 log = logging.getLogger("cana.services")
 
-# Instancia o repositório configurado no .env (PostgresMockRepository ou SysPDVApiRepository)
-repo = get_product_repository()
-
+# Consultas de catálogo são delegadas ao backend Java.
 # --------------------------------------------------------------------------
 # Catálogo e dicionários (usados pelo motor local e para normalizar a saída da IA)
 # --------------------------------------------------------------------------
@@ -100,9 +98,9 @@ _CATALOGO_NORM = {_sem_acento(p): p for p in CATALOGO_PRODUTOS}
 
 
 def consultar_produto_banco(termo: str) -> Optional[dict]:
-    """Consulta o banco de dados (PostgreSQL/SysPDV) via Repository Pattern."""
+    """Consulta o catálogo exclusivamente pela API Java."""
     try:
-        resultados = repo.buscar_por_nome(termo)
+        resultados = buscar_produtos(termo)
         if resultados:
             return resultados[0]
     except Exception as e:
@@ -205,9 +203,18 @@ def _parse_trecho(trecho: str) -> Optional[dict]:
     if len(nome) < 2:
         return None
     nome = corrigir_produto_fuzzy(nome)
+    produto_banco = consultar_produto_banco(nome)
+    if produto_banco:
+        nome = produto_banco.get("nome", nome)
     return {
-        "produto": nome, "marca_preferida": None, "quantidade": qtd, "unidade_medida": unid,
-        "categoria": inferir_categoria(nome), "aceita_substituicao": True, "observacao": "",
+        "produto": nome,
+        "produto_id": produto_banco.get("id") if produto_banco else None,
+        "marca_preferida": None,
+        "quantidade": qtd,
+        "unidade_medida": unid,
+        "categoria": (produto_banco.get("categoria") if produto_banco else None) or inferir_categoria(nome),
+        "aceita_substituicao": True,
+        "observacao": "",
     }
 
 
@@ -291,19 +298,19 @@ def obter_chain():
         from langchain_core.prompts import ChatPromptTemplate
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        def gemini(nome: str, temp: float):
+        def gemini(nome: str):
+            # Gemini 3.x controla o raciocínio por thinking_level; não force temperature.
             return ChatGoogleGenerativeAI(
-                model=nome, 
-                google_api_key=config.GEMINI_API_KEY,
-                temperature=temp, 
-                max_retries=1, 
+                model=nome,
+                api_key=config.GEMINI_API_KEY,
+                max_retries=1,
                 timeout=45,
             ).with_structured_output(ListaSeparacaoMercado)
 
-        primario = gemini(config.GEMINI_MODEL, 0.0)
+        primario = gemini(config.GEMINI_MODEL)
         fallbacks = []
         if config.GEMINI_FALLBACK_MODEL:
-            fallbacks.append(gemini(config.GEMINI_FALLBACK_MODEL, 0.1))
+            fallbacks.append(gemini(config.GEMINI_FALLBACK_MODEL))
         if config.OPENAI_API_KEY:
             from langchain_openai import ChatOpenAI
             fallbacks.append(
@@ -333,7 +340,14 @@ def chamar_gemini(texto_mensagem: str, itens_existentes: Optional[list] = None) 
             resultado = ListaSeparacaoMercado(**resultado)
 
         for item in resultado.itens:
+            item.produto_id = None  # O ID só pode vir do catálogo Java, nunca ser confiado ao modelo.
             item.produto = corrigir_produto_fuzzy(item.produto)
+            produto_banco = consultar_produto_banco(item.produto)
+            if produto_banco:
+                item.produto_id = produto_banco.get("id")
+                item.produto = produto_banco.get("nome", item.produto)
+                if produto_banco.get("categoria"):
+                    item.categoria = produto_banco["categoria"]
             if not item.categoria or item.categoria == "Outros":
                 item.categoria = inferir_categoria(item.produto)
             item.quantidade = formatar_quantidade(item.quantidade)
